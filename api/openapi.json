@@ -167,6 +167,52 @@
         "title": "CardPatch",
         "type": "object"
       },
+      "DraftPatch": {
+        "properties": {
+          "cite": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 0,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cite"
+          },
+          "spans": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SpanIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spans"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 0,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag"
+          }
+        },
+        "title": "DraftPatch",
+        "type": "object"
+      },
       "InviteIn": {
         "properties": {
           "days": {
@@ -617,6 +663,34 @@
           "content"
         ],
         "title": "SettingsFile",
+        "type": "object"
+      },
+      "SpanIn": {
+        "properties": {
+          "end_char": {
+            "title": "End Char",
+            "type": "integer"
+          },
+          "start_char": {
+            "title": "Start Char",
+            "type": "integer"
+          },
+          "style": {
+            "enum": [
+              "underline",
+              "highlight",
+              "emphasis"
+            ],
+            "title": "Style",
+            "type": "string"
+          }
+        },
+        "required": [
+          "style",
+          "start_char",
+          "end_char"
+        ],
+        "title": "SpanIn",
         "type": "object"
       },
       "SpanPatch": {
@@ -2142,6 +2216,185 @@
         ]
       }
     },
+    "/api/scan/drafts": {
+      "get": {
+        "description": "Your scans waiting to be checked, newest first. Drafts left untouched for 30 days are dropped.",
+        "operationId": "list_drafts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "List Drafts",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
+    "/api/scan/drafts/{n}": {
+      "delete": {
+        "description": "Discard a draft, or clear it once its card is saved.",
+        "operationId": "discard_draft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Discard Draft",
+        "tags": [
+          "scan"
+        ]
+      },
+      "get": {
+        "operationId": "get_draft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Get Draft",
+        "tags": [
+          "scan"
+        ]
+      },
+      "patch": {
+        "description": "Fix the tag or cite, or mark the words: `spans` replaces the draft's marks (underline, highlight, emphasis over\n`body`, UTF-16 offsets on whole characters). The words themselves stay as read: the card keeps them exactly.",
+        "operationId": "edit_draft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Edit Draft",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
+    "/api/scan/photo": {
+      "post": {
+        "description": "A photo of paper at any angle, as the camera took it. This server finds the card's four corners, squares the\ncard up (undoing its tilt toward the camera), turns it upright and reads it into a draft to check, as\n/scan/screenshot, plus `corners`: where it found them, as fractions of the upright photo (TL TR BR BL, x y). Send\n`corners` (a JSON list of 8 such fractions) with `replaces` to read it again from corners the member dragged.",
+        "operationId": "scan_photo_of_paper",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "corners": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Corners"
+                  },
+                  "photo": {
+                    "format": "binary",
+                    "title": "Photo",
+                    "type": "string"
+                  },
+                  "replaces": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Replaces"
+                  }
+                },
+                "required": [
+                  "photo"
+                ],
+                "title": "MultiPartBodyParams",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Scan Photo Of Paper",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
     "/api/scan/report": {
       "post": {
         "description": "A scan that failed on the member's phone before it reached /scan (the camera, the scanner script, the picture,\nor the upload): `step` where, `message` what the phone said, `agent` its browser. Written to this server's log\nonly, so the team's operator can see a failure that never left the phone.",
@@ -2163,6 +2416,75 @@
           }
         },
         "summary": "Report Scan",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
+    "/api/scan/screenshot": {
+      "post": {
+        "description": "A screenshot, read as it is (no corners, no turning, lossless), into a draft to check: `id`, `kind`, `tag`,\n`cite`, `body`, `text`, `markdown`, `spans`. A picture a camera took is read as a photo instead, and `kind` says\n`photo`. `replaces`: one of your drafts this reads again (200 instead of 201). The picture isn't kept.",
+        "operationId": "scan_screenshot",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "photo": {
+                    "format": "binary",
+                    "title": "Photo",
+                    "type": "string"
+                  },
+                  "replaces": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Replaces"
+                  }
+                },
+                "required": [
+                  "photo"
+                ],
+                "title": "MultiPartBodyParams",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Scan Screenshot",
         "tags": [
           "scan"
         ]
