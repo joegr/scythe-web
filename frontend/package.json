@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@techstark/opencv-js": "4.12.0-release.1",
     "dompurify": "^3.2.3",
     "markdown-it": "^14.1.0",
     "markdown-it-mark": "^4.0.0",
