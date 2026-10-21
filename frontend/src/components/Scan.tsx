@@ -15,7 +15,9 @@ const ago = (iso: string) => {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60_000)
   return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`
 }
-const preview = (d: Draft) => d.tag || d.body.split(/\s+/).slice(0, 8).join(' ') || 'Untitled scan'
+const preview = (d: Draft) => d.tag || d.body.split(/\s+/).slice(0, 8).join(' ') || 'Untitled'
+/** A tag or cite box as tall as what's in it: a long cite reads whole, not cut off at one line. */
+const grow = (el: HTMLTextAreaElement | null) => { if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px` } }
 
 /** Scan cards into a queue, then check each one: a screenshot is read as it is, a photo of paper is squared up to the
  *  card's corners on the team's server, and either waits as your draft (words and marks, never the picture) until you
@@ -184,7 +186,8 @@ export default function Scan({ open, onClose, onSaved, start = 'camera' }:
       // The server keeps the approved tag, cite and marks, and says what the source's text now is.
       const ok = await editDraft(d.id, { tag: d.tag, cite: d.cite, spans: d.spans.map((s) => ({ style: s.style, start_char: s.start_char, end_char: s.end_char })) })
       const topic = await require()
-      const title = ok.tag.trim() || 'Scanned card'
+      // A card whose tag can't be made out is saved as Untitled, to be tagged later.
+      const title = ok.tag.trim() || 'Untitled'
       const source = await createSource({ text: ok.text, title, cite: ok.cite })
       // The marks count characters of the body; a card made from the whole text (no body read) has none.
       const card = await createCard({ text: ok.body || ok.text, title, cite: ok.cite, source, topic, spans: ok.body ? ok.spans : [] })
@@ -251,12 +254,24 @@ export default function Scan({ open, onClose, onSaved, start = 'camera' }:
           </div>
         )}
         {step === 'check' && d && (
-          <div className="stack">
+          <div className="stack scan-check">
             <p className="note">{d.kind === 'screenshot' ? 'Read as a screenshot.' : 'Squared up from a photo of paper.'}
               {kept && <> <button className="link" onClick={() => void again(d.kind === 'screenshot' ? 'photo' : 'screenshot')}>
                 read it as a {d.kind === 'screenshot' ? 'photo' : 'screenshot'} instead</button></>}</p>
-            <input className="field" style={{ fontWeight: 600 }} placeholder="Tag" maxLength={300} value={d.tag} onChange={(e) => setCurrent({ ...d, tag: e.target.value })} />
-            <input className="field" placeholder="Cite" maxLength={2000} value={d.cite} onChange={(e) => setCurrent({ ...d, cite: e.target.value })} />
+            {/* The card as it will be saved: its tag, cite and words, the whole screen on a phone. */}
+            <article className="card scan-card">
+              <textarea className="card-tag scan-line" rows={1} ref={grow} placeholder="Tag" maxLength={300} value={d.tag}
+                onChange={(e) => { grow(e.currentTarget); setCurrent({ ...d, tag: e.target.value.replace(/\n/g, ' ') }) }} />
+              <textarea className="card-cite scan-line" rows={1} ref={grow} placeholder="Cite" maxLength={2000} value={d.cite}
+                onChange={(e) => { grow(e.currentTarget); setCurrent({ ...d, cite: e.target.value.replace(/\n/g, ' ') }) }} />
+              {/* The marks on the paper, retold as Scythe's underlines over the same words (a highlighter's is the heavy one). */}
+              <div className="card-body scan-body">
+                <TokenText text={d.body} spans={d.spans} editable mark={selection} activeKey={active ? spanKey(active) : null}
+                  onSelect={(r) => { const s = r ? snapChars(d.body, r[0], r[1]) : null; setSelection(s); if (s) setActive(null) }} onSpanClick={pick} />
+              </div>
+            </article>
+            <p className="note">These are the words as read{d.spans.length ? ', with their marks' : ''}. Select words to underline, highlight or emphasize them; tap a mark to remove it. If a word is misread, take it again: the card keeps the words exactly.</p>
+            <div className="scan-tools stack">
             <div className="row">
               {MARKS.map((l) => (
                 <button key={l.name} className="link" disabled={!selection} onMouseDown={(e) => e.preventDefault()} onClick={() => mark(l.style)}>
@@ -265,18 +280,13 @@ export default function Scan({ open, onClose, onSaved, start = 'camera' }:
               ))}
               {active && <button className="link spacer" onClick={() => unmark(active)}>remove {active.style}</button>}
             </div>
-            {/* The marks on the paper, retold as Scythe's underlines over the same words (a highlighter's is the heavy one). */}
-            <div className="scan-body">
-              <TokenText text={d.body} spans={d.spans} editable mark={selection} activeKey={active ? spanKey(active) : null}
-                onSelect={(r) => { const s = r ? snapChars(d.body, r[0], r[1]) : null; setSelection(s); if (s) setActive(null) }} onSpanClick={pick} />
-            </div>
-            <p>These are the words as read{d.spans.length ? ', with their marks' : ''}. Select words to underline, highlight or emphasize them; tap a mark to remove it. If a word is misread, take it again: the card keeps the words exactly.</p>
             <div className="row">
               <button className="action" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save card'}</button>
               {d.kind === 'photo' && kept && <button className="link" onClick={() => { setCorners(d.corners ?? [0, 0, 1, 0, 1, 1, 0, 1]); setStep('corners') }}>adjust the corners</button>}
               <button className="link" onClick={() => void discard()}>discard</button>
               {drafts.length > 1 && <button className="link spacer" onClick={() => setStep('queue')}>all scans</button>}
               {scanner && drafts.length <= 1 && <button className="link spacer" onClick={() => void camera()}>scan another</button>}
+            </div>
             </div>
           </div>
         )}
