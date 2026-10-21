@@ -1,16 +1,18 @@
 /**
- * Scanning a printed card with a phone's camera (phones and tablets only). Scythe finds the card's four corners
- * (OpenCV, as opencv.js, loaded only when scanning) and warps the photo back to the card's own flat frame: the
- * inverse of the tilt the camera saw. Only that squared-up card goes to the team's server, which reads it with OCR
- * into a draft card: tag, cite, body, and the marks on the paper (underlines, highlighter, emphasis) as
- * spans over the body. The server doesn't keep the photo. What OCR reads becomes the card's source, and the card is
- * cut from it word for word.
+ * Scanning a card. A screenshot goes to the team's server as it is, to be read; a photo of paper goes as the camera
+ * took it, and the server finds the card's four corners, squares it up (the inverse of the tilt the camera saw), turns
+ * it upright and reads it. Either way the server keeps what it read as the member's own draft: tag, cite, body, and
+ * the marks on the paper (underlines, highlighter, emphasis) as spans over the body. Never the picture. The member
+ * checks it, marks it and saves it; what OCR read becomes the card's source, and the card is cut from it word for word.
  */
-import opencvUrl from '@techstark/opencv-js/dist/opencv.js?url'
 import { api, ApiError, config } from './api'
 import type { SpanRec } from './doc'
 
 export interface ScanDraft { tag: string; cite: string; body: string; text: string; markdown: string; spans: SpanRec[] }
+export type ScanKind = 'screenshot' | 'photo'
+/** A scan waiting for its member: what the server read. `corners`: where it squared a photo up to, as fractions of the
+ *  upright photo (TL TR BR BL, x y), for dragging. */
+export interface Draft extends ScanDraft { id: number; kind: ScanKind; corners: number[] | null; created_at: string }
 
 /** A phone or tablet: a touch screen with a coarse pointer (or the browser says it's mobile). */
 export function isMobile(): boolean {
@@ -71,26 +73,6 @@ export function still(video: HTMLVideoElement): HTMLCanvasElement {
   return drawn(video, video.videoWidth, video.videoHeight)
 }
 
-/** A saved photo, at most BIGGEST on its long side (the browser applies its EXIF turn). An <img> where
- *  createImageBitmap can't decode it (older Safari): both turn the photo upright. */
-export async function photoCanvas(photo: Blob): Promise<HTMLCanvasElement> {
-  try {
-    const bmp = await createImageBitmap(photo, { imageOrientation: 'from-image' })
-    try { return drawn(bmp, bmp.width, bmp.height) } finally { bmp.close() }
-  } catch (e) {
-    if ((e as Error).message === OUT_OF_MEMORY) throw e
-  }
-  const url = URL.createObjectURL(photo)
-  try {
-    const img = new Image()
-    img.src = url
-    await img.decode().catch(() => { throw new Error('That isn’t a photo this browser can open.') })
-    return drawn(img, img.naturalWidth, img.naturalHeight)
-  } finally {
-    URL.revokeObjectURL(url)
-  }
-}
-
 // ---------------------------------------------------------------- the team's server, awake
 // A team's Scythe stops when nobody has used it for a few minutes and starts again on the next request, which takes
 // a quarter of a minute (its database comes up first). A scan is exactly a few quiet minutes then a big upload, so
@@ -126,140 +108,75 @@ export function readPhoto(photo: Blob, onWait?: () => void): Promise<ScanDraft> 
   return whileWaking(() => api<ScanDraft>('POST', '/scan', form), onWait)
 }
 
-// ---------------------------------------------------------------- the card's plane
+// ---------------------------------------------------------------- screenshot or photo
+// A screenshot is read as it is; a photo of paper is squared up first. Scythe tells them apart by what the file says:
+// a camera writes its make and model (EXIF) into every photo, and a screenshot is a PNG (iPhone, Android, Mac) with
+// no camera in it. A JPEG with no camera named is read as a photo, which still reads a screenshot well (the server
+// finds no corners and reads it whole). The server checks the EXIF again, and the member can switch it.
 
-type CV = typeof import('@techstark/opencv-js')
-export interface Pt { x: number; y: number }
-/** Corners in image pixels: top left, top right, bottom right, bottom left. */
-export type Quad = [Pt, Pt, Pt, Pt]
-
-declare const squared: unique symbol
-/** A card warped flat. Only rectify() makes one, and only a RectifiedCard is read as a card. */
-export interface RectifiedCard { readonly canvas: HTMLCanvasElement; readonly quad: Quad; readonly [squared]: true }
-
-// opencv.js runs as a classic script, fetched only when scanning, and announces itself as the global `cv`. It isn't
-// imported as a module: it's a thenable (an emscripten build), so awaiting its import never settles.
-let loading: Promise<{ cv: CV }> | null = null
-export function loadCv(): Promise<{ cv: CV }> {
-  return loading ??= new Promise<{ cv: CV }>((resolve, reject) => {
-    const started = Date.now()
-    const ready = () => {
-      const cv = (window as { cv?: CV }).cv
-      if (cv && typeof cv.Mat === 'function') resolve({ cv })
-      else if (Date.now() - started > 60_000) reject(new Error('Scythe’s scanner took too long to start.'))
-      else setTimeout(ready, 50) // its runtime may already be up by now, so look rather than wait to be told
-    }
-    const script = document.createElement('script')
-    script.src = opencvUrl
-    script.async = true
-    script.onload = ready
-    script.onerror = () => reject(new Error('Scythe couldn’t load its scanner. Check your connection and try again.'))
-    document.head.appendChild(script)
-  }).catch((e) => { loading = null; throw e })
-}
-
-/** Order four points TL, TR, BR, BL: TL has the least x+y, BR the most; TR the least y−x, BL the most. */
-export function order(pts: Pt[]): Quad {
-  const by = (f: (p: Pt) => number) => [...pts].sort((a, b) => f(a) - f(b))
-  const sum = by((p) => p.x + p.y), diff = by((p) => p.y - p.x)
-  return [sum[0], diff[0], sum[3], diff[3]]
-}
-
-const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y)
-/** The flat card's size: the mean of opposite edges (the server checks the image against this). */
-export function rectifiedSize([tl, tr, br, bl]: Quad): { w: number; h: number } {
-  return { w: (dist(tl, tr) + dist(bl, br)) / 2, h: (dist(tl, bl) + dist(tr, br)) / 2 }
-}
-
-/** The whole frame, for a card that fills the picture (or when no edges were found: the corners can be dragged). */
-export function frameQuad(w: number, h: number): Quad {
-  return [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }]
-}
-
-// The one small canvas every look for the card draws into: the live look runs eight times a second, and a new canvas
-// each time is what runs a phone out of canvas memory.
-let looking: HTMLCanvasElement | null = null
-
-/** The card's corners in a frame: edges → the largest convex four-sided contour covering a fair part of it. */
-export function detectQuad(cv: CV, frame: HTMLCanvasElement | HTMLVideoElement, maxSide = 480): Quad | null {
-  const W = frame instanceof HTMLVideoElement ? frame.videoWidth : frame.width
-  const H = frame instanceof HTMLVideoElement ? frame.videoHeight : frame.height
-  if (!W || !H) return null
-  const k = Math.min(1, maxSide / Math.max(W, H))
-  const small = (looking ??= document.createElement('canvas'))
-  const w = Math.round(W * k), h = Math.round(H * k)
-  if (small.width !== w || small.height !== h) { small.width = w; small.height = h }
-  const ctx = context(small, { willReadFrequently: true })
-  ctx.drawImage(frame, 0, 0, small.width, small.height)
-
-  const src = cv.matFromImageData(ctx.getImageData(0, 0, small.width, small.height))
-  const gray = new cv.Mat(), edges = new cv.Mat(), contours = new cv.MatVector(), hierarchy = new cv.Mat()
-  const kernel = cv.Mat.ones(3, 3, cv.CV_8U)
-  try {
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY)
-    cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0)
-    cv.Canny(gray, edges, 50, 150)
-    cv.dilate(edges, edges, kernel)
-    cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-    let best: Pt[] | null = null, bestArea = 0.12 * small.width * small.height
-    for (let i = 0; i < contours.size(); i++) {
-      const c = contours.get(i), approx = new cv.Mat()
-      cv.approxPolyDP(c, approx, 0.02 * cv.arcLength(c, true), true)
-      const area = cv.contourArea(approx)
-      if (approx.rows === 4 && area > bestArea && cv.isContourConvex(approx)) {
-        bestArea = area
-        best = Array.from({ length: 4 }, (_, j) => ({ x: approx.data32S[2 * j] / k, y: approx.data32S[2 * j + 1] / k }))
+/** Whether a JPEG's EXIF names a camera (Make 0x010F or Model 0x0110 in IFD0). Reads only the file's first 128 KB. */
+export function cameraExif(bytes: Uint8Array): boolean {
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  if (v.byteLength < 4 || v.getUint16(0) !== 0xffd8) return false
+  for (let i = 2; i + 4 <= v.byteLength;) {
+    if (v.getUint8(i) !== 0xff) return false
+    const marker = v.getUint8(i + 1), size = v.getUint16(i + 2)
+    if (marker === 0xe1 && i + 10 <= v.byteLength && v.getUint32(i + 4) === 0x45786966) { // "Exif"
+      const t = i + 10
+      if (t + 8 > v.byteLength) return false
+      const le = v.getUint16(t) === 0x4949
+      const ifd = t + v.getUint32(t + 4, le)
+      if (ifd + 2 > v.byteLength) return false
+      const n = v.getUint16(ifd, le)
+      for (let k = 0; k < n && ifd + 2 + 12 * (k + 1) <= v.byteLength; k++) {
+        const tag = v.getUint16(ifd + 2 + 12 * k, le)
+        if (tag === 0x010f || tag === 0x0110) return true
       }
-      approx.delete(); c.delete()
+      return false
     }
-    return best && order(best)
-  } finally {
-    src.delete(); gray.delete(); edges.delete(); contours.delete(); hierarchy.delete(); kernel.delete()
+    if (marker === 0xda) return false // the image data: no EXIF before it
+    i += 2 + size
   }
+  return false
 }
 
-/**
- * Warp the photo so the quad becomes an upright rectangle: the homography quad → rectangle undoes the card's tilt in
- * space. The longest side is capped at `maxSide`, and the quad scaled with it, so the server can check the image
- * really is this quad's warp. (A quarter or half turn in the card's own plane is righted by the server.)
- */
-export function rectify(cv: CV, photo: HTMLCanvasElement, quad: Quad, maxSide = 2400): RectifiedCard {
-  const size = rectifiedSize(quad)
-  const k = Math.min(1, maxSide / Math.max(size.w, size.h))
-  const q = quad.map((p) => ({ x: p.x * k, y: p.y * k })) as Quad
-  const w = Math.round(size.w * k), h = Math.round(size.h * k)
+/** What kind of picture a chosen file is: a PNG or WebP with no camera in it is a screenshot; anything else, a photo. */
+export async function kindOf(file: Blob): Promise<ScanKind> {
+  const head = new Uint8Array(await file.slice(0, 128 * 1024).arrayBuffer())
+  const png = head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47
+  const webp = head[0] === 0x52 && head[1] === 0x49 && head[8] === 0x57 && head[9] === 0x45
+  return (png || webp) && !cameraExif(head) ? 'screenshot' : 'photo'
+}
 
-  const src = cv.imread(photo), dst = new cv.Mat()
-  const from = cv.matFromArray(4, 1, cv.CV_32FC2, quad.flatMap((p) => [p.x, p.y]))
-  const to = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, size.w * k, 0, size.w * k, size.h * k, 0, size.h * k])
-  const M = cv.getPerspectiveTransform(from, to)
-  const canvas = document.createElement('canvas')
+/** The camera's current frame as a JPEG, at most BIGGEST on its long side; its canvas is released at once. */
+export async function stillPhoto(video: HTMLVideoElement): Promise<Blob> {
+  const canvas = still(video)
   try {
-    cv.warpPerspective(src, dst, M, new cv.Size(w, h), cv.INTER_CUBIC, cv.BORDER_REPLICATE, new cv.Scalar())
-    cv.imshow(canvas, dst)
-  } finally {
-    src.delete(); dst.delete(); from.delete(); to.delete(); M.delete()
-  }
-  return { canvas, quad: q } as RectifiedCard
+    return await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(OUT_OF_MEMORY))), 'image/jpeg', 0.92))
+  } finally { release(canvas) }
 }
 
-/** Read a squared-up card: the draft, with the marks on the paper as spans over its body. Nothing is kept. */
-export async function readCard(card: RectifiedCard, onWait?: () => void): Promise<ScanDraft> {
-  const blob = await new Promise<Blob>((resolve, reject) =>
-    card.canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('The camera gave no picture.'))), 'image/jpeg', 0.92))
+// ---------------------------------------------------------------- the team's server: reading, and the queue
+
+export const MAX_BYTES = 12 * 1024 * 1024 // what the server takes (scan.MAX_BYTES)
+
+/** Send a picture to be read as `kind` (the file as it is: no canvas, nothing re-encoded), into a draft. `replaces`:
+ *  one of the member's drafts this reads again; `corners`: for a photo, where to square it up to (fractions). */
+export function readScan(picture: Blob, kind: ScanKind, opts: { replaces?: number; corners?: number[]; onWait?: () => void } = {}): Promise<Draft> {
+  if (picture.size > MAX_BYTES) return Promise.reject(new Error('That picture is too large (12 MB at most).'))
   const form = new FormData()
-  form.append('photo', blob, 'card.jpg')
-  form.append('quad', JSON.stringify(card.quad.flatMap((p) => [p.x, p.y])))
-  return whileWaking(() => api<ScanDraft>('POST', '/scan', form), onWait)
+  form.append('photo', picture, kind === 'screenshot' ? 'screenshot.png' : 'photo.jpg')
+  if (opts.replaces !== undefined) form.append('replaces', String(opts.replaces))
+  if (opts.corners) form.append('corners', JSON.stringify(opts.corners))
+  return whileWaking(() => api<Draft>('POST', `/scan/${kind}`, form), opts.onWait)
 }
 
-/** A picture as it is, when the scanner can't run here (it didn't load, or this phone ran out of room): the server
- *  reads the photo without squaring it up, so a card shot straight on still reads. */
-export async function readPicture(canvas: HTMLCanvasElement, onWait?: () => void): Promise<ScanDraft> {
-  const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('The camera gave no picture.'))), 'image/jpeg', 0.92))
-  return readPhoto(blob, onWait)
-}
+export const listDrafts = () => api<Draft[]>('GET', '/scan/drafts')
+export const getDraft = (id: number) => api<Draft>('GET', `/scan/drafts/${id}`)
+export const editDraft = (id: number, patch: { tag?: string; cite?: string; spans?: { style: string; start_char: number; end_char: number }[] }) =>
+  api<Draft>('PATCH', `/scan/drafts/${id}`, patch)
+export const discardDraft = (id: number) => api<null>('DELETE', `/scan/drafts/${id}`)
 
 /** Tell the team's server a scan failed on this phone, and where: what the phone saw, never the picture. A report
  *  that can't be sent is dropped (it's only for the logs). */

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import CardView from '../components/CardView'
 import Reader from '../components/Reader'
 import Scan from '../components/Scan'
-import { isMobile } from '../lib/scan'
+import { isMobile, listDrafts } from '../lib/scan'
 import { countWords, pasteOver, sanitizeText, tooLongCard, WORDS } from '../lib/text'
 import { createCard, createSource, listCards, type CardDoc } from '../lib/store'
 import { topicLabel, useTopic } from '../lib/topic'
@@ -15,13 +15,18 @@ export default function HomePage({ scan = false }: { scan?: boolean }) {
   const signedIn = useSignedIn()
   const { current, require, choose } = useTopic()
   const [reader, setReader] = useState(false)
-  const [scanning, setScanning] = useState(scan)
+  // The scanner sheet: closed, on the camera, or on the scans waiting to be checked (from any device).
+  const [scanning, setScanning] = useState<false | 'camera' | 'queue'>(scan ? 'camera' : false)
+  const [toCheck, setToCheck] = useState(0)
   const [clip, setClip] = useState<{ text: string; title: string; cite: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [recent, setRecent] = useState<CardDoc[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => { listCards({ limit: 15 }).then(setRecent).catch((e) => setError(e.message)) }, [])
+  // Scans waiting for this member, counted again each time the scanner closes. Not being able to count them hides
+  // the link and nothing else.
+  useEffect(() => { if (signedIn && !scanning) listDrafts().then((ds) => setToCheck(ds.length)).catch(() => setToCheck(0)) }, [signedIn, scanning])
 
   /** A clip is the author's words as pasted: they're saved as a source, and the card is that whole source, so even a
    *  quick card is the source's own words (the server checks). */
@@ -40,7 +45,8 @@ export default function HomePage({ scan = false }: { scan?: boolean }) {
     <div className="stack">
       {signedIn && (
         <section className="gap">
-          {isMobile() && <p><button className="action" onClick={() => setScanning(true)}>Scan a card</button></p>}
+          {isMobile() && <p><button className="action" onClick={() => setScanning('camera')}>Scan a card</button></p>}
+          {toCheck > 0 && <p><button className="link" onClick={() => setScanning('queue')}>{toCheck === 1 ? '1 scan' : `${toCheck} scans`} to check</button></p>}
           <p>
             <button className="link" onClick={() => setReader(true)}>Open a source</button> to cut a card from it, or{' '}
             <button className="link" onClick={() => setClip(clip ? null : { text: '', title: '', cite: '' })}>paste a clip</button>
@@ -71,7 +77,7 @@ export default function HomePage({ scan = false }: { scan?: boolean }) {
       {recent?.length === 0 && <p>No cards yet.</p>}
       {recent?.map((c) => <CardView key={c.number} card={c} mode="read" />)}
       <Reader open={reader} onClose={() => setReader(false)} onCut={(n) => navigate(`/cards/${n}`)} />
-      {signedIn && <Scan open={scanning} onClose={() => { setScanning(false); if (scan) navigate('/') }} onSaved={(n) => { setScanning(false); navigate(`/cards/${n}`) }} />}
+      {signedIn && <Scan open={!!scanning} start={scanning || 'camera'} onClose={() => { setScanning(false); if (scan) navigate('/') }} onSaved={(n) => { setScanning(false); navigate(`/cards/${n}`) }} />}
     </div>
   )
 }

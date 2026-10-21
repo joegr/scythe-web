@@ -1,224 +1,292 @@
 import { useEffect, useRef, useState } from 'react'
-import { cameraSupported, closeCamera, detectQuad, frameQuad, loadCv, openCamera, photoCanvas, readCard, readPicture, rectify,
-  release, reportScan, still, wake, type Pt, type Quad, type ScanDraft } from '../lib/scan'
+import { cameraSupported, closeCamera, discardDraft, editDraft, isMobile, kindOf, listDrafts, openCamera, readScan,
+  reportScan, stillPhoto, wake, type Draft, type ScanKind } from '../lib/scan'
+import { DEFAULT_LABELS, snapChars, type SpanRec } from '../lib/doc'
+import { createCard, createSource, spanKey } from '../lib/store'
+import { useTopic } from '../lib/topic'
 import PhotoPick from './PhotoPick'
 import TokenText from './TokenText'
-import { createCard, createSource } from '../lib/store'
-import { useTopic } from '../lib/topic'
 
-type CV = Awaited<ReturnType<typeof loadCv>>['cv']
-const DETECT_MS = 125 // about 8 looks for the card a second; the box is drawn every frame
-const SMOOTH = 0.4    // how far each look moves the drawn box toward what it found
-const LOST_AFTER = 6  // looks in a row without the card before its box goes
-const CV_WAIT = 20_000 // how long a picture waits for the scanner before it's read as it is
+type Step = 'camera' | 'queue' | 'check' | 'corners'
+const MARKS = DEFAULT_LABELS.filter((l) => ['underline', 'highlight', 'emphasis'].includes(l.style))
+const KEEP_PICTURES = 6 // pictures kept on the phone (to read again or drag corners), newest first; the server keeps none
 
-/** The scanner, or null if it isn't ready within `ms` (the picture is then read without squaring it up). `cv` is a
- *  thenable whose `then` hands back itself, so it stays wrapped: a promise resolved with it, or an async function
- *  returning it, chases it forever and locks the page. */
-async function scannerWithin(ms: number): Promise<{ cv: CV } | null> {
-  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
-  try { return await Promise.race([loadCv(), timeout]) } catch { return null }
+const ago = (iso: string) => {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60_000)
+  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`
 }
+const preview = (d: Draft) => d.tag || d.body.split(/\s+/).slice(0, 8).join(' ') || 'Untitled scan'
 
-/** Scan a printed card: the camera (asked for only now) with the card's outline as it's found, the picture squared up
- *  to the card, the server's reading (words, and the marks on the paper as underlines), then save it as a card. */
-export default function Scan({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: (card: number) => void }) {
+/** Scan cards into a queue, then check each one: a screenshot is read as it is, a photo of paper is squared up to the
+ *  card's corners on the team's server, and either waits as your draft (words and marks, never the picture) until you
+ *  check its words, mark it and save it as a card. On a computer the sheet opens on the queue: checking needs no camera. */
+export default function Scan({ open, onClose, onSaved, start = 'camera' }:
+  { open: boolean; onClose: () => void; onSaved: (card: number) => void; start?: 'camera' | 'queue' }) {
   const ref = useRef<HTMLDialogElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const stream = useRef<MediaStream | null>(null)
-  const seen = useRef<Quad | null>(null)
+  const pictures = useRef(new Map<number, { blob: Blob; url?: string }>())
   const { require } = useTopic()
-  const [cv, setCv] = useState<CV | null>(null)
-  const [step, setStep] = useState<'camera' | 'corners' | 'reading' | 'draft'>('camera')
+  const [step, setStep] = useState<Step>(start)
   const [live, setLive] = useState(false)
-  const [box, setBox] = useState<Quad | null>(null)
-  const [photo, setPhoto] = useState<{ canvas: HTMLCanvasElement; quad: Quad } | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [draft, setDraft] = useState<ScanDraft | null>(null)
+  const [drafts, setDraftList] = useState<Draft[]>([])
+  const [reading, setReading] = useState(0)
+  // The queue and the reads in flight, as of now: a read that lands decides from these whether to open its draft.
+  const queue = useRef<Draft[]>([])
+  const inFlight = useRef(0)
+  const setDrafts = (next: Draft[]) => { queue.current = next; setDraftList(next) }
+  const [current, setCurrent] = useState<Draft | null>(null)
+  const [selection, setSelection] = useState<[number, number] | null>(null)
+  const [active, setActive] = useState<SpanRec | null>(null)
+  const [corners, setCorners] = useState<number[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   // What the scanner is doing right now, in words: a step that takes a moment never looks like nothing happening.
   const [status, setStatus] = useState<string | null>(null)
-  const [note, setNote] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const scanner = isMobile()
 
-  const stop = () => { closeCamera(stream.current); stream.current = null; seen.current = null; setLive(false); setBox(null) }
+  const stop = () => { closeCamera(stream.current); stream.current = null; setLive(false) }
   /** Say what went wrong, and tell the team's server where (for its logs). */
-  const fail = (step: string, e: unknown) => { setStatus(null); setError((e as Error).message || String(e)); reportScan(step, e) }
-  const start = async () => {
-    setError(null); setNote(null); setStep('camera'); setDraft(null); setPreview(null)
-    setPhoto((p) => { release(p?.canvas); return null })
-    if (!cameraSupported()) return
+  const fail = (where: string, e: unknown) => { setStatus(null); setError((e as Error).message || String(e)); reportScan(where, e) }
+  const camera = async () => {
+    setError(null); setStep('camera')
+    if (!scanner || !cameraSupported() || stream.current) return
     setStatus('Starting the camera…')
     try {
       stream.current = await openCamera()
       if (video.current) { video.current.srcObject = stream.current; await video.current.play() }
-      setLive(true); setStatus(cv ? null : 'Starting the scanner…')
+      setLive(true); setStatus(null)
     } catch {
       setStatus(null)
       setError('Scythe can’t use the camera here (permission refused?). Take the picture with your camera instead.')
     }
   }
+  const forget = () => {
+    for (const p of pictures.current.values()) if (p.url) URL.revokeObjectURL(p.url)
+    pictures.current.clear()
+  }
+  const keep = (id: number, blob: Blob) => {
+    const old = pictures.current.get(id)
+    if (old?.url) URL.revokeObjectURL(old.url)
+    pictures.current.delete(id)
+    pictures.current.set(id, { blob })
+    for (const [k, p] of [...pictures.current].slice(0, Math.max(0, pictures.current.size - KEEP_PICTURES))) {
+      if (p.url) URL.revokeObjectURL(p.url)
+      pictures.current.delete(k)
+    }
+  }
+  const pictureUrl = (id: number) => {
+    const p = pictures.current.get(id)
+    if (!p) return null
+    p.url ??= URL.createObjectURL(p.blob)
+    return p.url
+  }
+
+  const check = (d: Draft) => {
+    stop(); setCurrent(d); setSelection(null); setActive(null); setError(null); setStep('check')
+  }
 
   useEffect(() => {
     const d = ref.current!
     if (open && !d.open) {
-      d.showModal(); void start()
+      d.showModal()
+      setDrafts([]); setCurrent(null); inFlight.current = 0; setReading(0)
+      listDrafts().then((ds) => setDrafts([...queue.current, ...ds.filter((x) => !queue.current.some((q) => q.id === x.id))])).catch((e) => fail('queue', e))
+      if (start === 'camera' && scanner) void camera()
+      else setStep('queue')
     }
-    if (!open && d.open) { d.close(); stop(); setPhoto((p) => { release(p?.canvas); return null }) }
+    if (!open && d.open) { d.close(); stop(); forget() }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps -- only opening and closing the sheet starts or stops it
-  useEffect(() => () => closeCamera(stream.current), []) // the camera never stays on after the sheet goes
+  useEffect(() => () => { closeCamera(stream.current); forget() }, []) // the camera never stays on after the sheet goes
   // The team's server wakes as the scanner opens, and stays awake while it's open (lib/scan.ts: wake).
   useEffect(() => {
     if (!open) return
     wake()
-    const keep = setInterval(wake, 120_000)
-    return () => clearInterval(keep)
+    const keepAwake = setInterval(wake, 120_000)
+    return () => clearInterval(keepAwake)
   }, [open])
   const waiting = () => setStatus('Waking up your team’s Scythe… this takes a few seconds.')
 
-  // The scanner (OpenCV) loads once the camera is up, so its weight never holds the camera back.
-  useEffect(() => {
-    if (!open || !live || cv) return
-    loadCv().then(({ cv }) => { setCv(() => cv); setStatus(null) }).catch((e) => {
-      // The picture can still be taken: it's read as it is, without squaring up.
-      setStatus(null); setNote('Scythe’s scanner didn’t load, so the picture will be read as it is. Hold the phone straight over the card.')
-      reportScan('load', e)
-    })
-  }, [open, live, cv])
-
-  // The card's outline over the camera, as it's found.
-  useEffect(() => {
-    if (!cv || !live) return
-    let raf = 0, last = 0, misses = 0, broken = 0
-    const look = (t: number) => {
-      const v = video.current
-      if (v && v.videoWidth && t - last > DETECT_MS && !document.hidden) {
-        last = t
-        let found: Quad | null = null
-        try { found = detectQuad(cv, v); broken = 0 } catch (e) {
-          // The live outline is a help, not a step: after a few failures it stops, and the picture is still taken.
-          if (++broken >= 3) { reportScan('look', e); setBox(null); return }
-        }
-        const prev = seen.current
-        if (found) {
-          misses = 0
-          seen.current = prev ? prev.map((p, i) => ({ x: p.x + (found[i].x - p.x) * SMOOTH, y: p.y + (found[i].y - p.y) * SMOOTH })) as Quad : found
-        } else if (++misses >= LOST_AFTER) seen.current = null
-        setBox(seen.current)
-      }
-      raf = requestAnimationFrame(look)
-    }
-    raf = requestAnimationFrame(look)
-    return () => cancelAnimationFrame(raf)
-  }, [cv, live])
-
-  /** Square the picture up to the card's corners, and only then read it. Without the scanner (it didn't load, or this
-   *  phone ran out of room squaring it up), the picture is read as it is. */
-  const read = async (canvas: HTMLCanvasElement, quad: Quad | null) => {
-    stop(); setStep('reading'); setError(null); setPhoto(quad ? { canvas, quad } : null)
-    const c = cv ?? (quad ? (await scannerWithin(CV_WAIT))?.cv : null)
-    let card: ReturnType<typeof rectify> | null = null
-    if (c && quad) {
-      setStatus('Squaring the card up…')
-      try { card = rectify(c, canvas, quad) } catch (e) { reportScan('square', e) }
-    }
+  /** Send a picture to be read. The camera stays ready for the next card; a first card read with nothing else waiting
+   *  opens straight away for checking. */
+  const send = async (where: string, get: () => Promise<{ blob: Blob; kind: ScanKind }>) => {
+    setError(null)
+    setReading(++inFlight.current)
     try {
-      setStatus('Reading the words…')
-      if (card) {
-        setPreview(card.canvas.toDataURL('image/jpeg', 0.8))
-        setDraft(await readCard(card, waiting))
-      } else {
-        setPreview(canvas.toDataURL('image/jpeg', 0.8))
-        setNote('Read as it is, without squaring it up. If words are missing, take it again straight over the card.')
-        setDraft(await readPicture(canvas, waiting))
-      }
-      setStatus(null); setStep('draft')
+      const { blob, kind } = await get()
+      setStatus(kind === 'screenshot' ? 'Reading the screenshot…' : 'Squaring the card up and reading it…')
+      const d = await readScan(blob, kind, { onWait: waiting })
+      keep(d.id, blob)
+      setStatus(null)
+      setDrafts([d, ...queue.current.filter((x) => x.id !== d.id)])
+      setReading(--inFlight.current)
+      if (inFlight.current === 0 && queue.current.length === 1) check(d)
     } catch (e) {
-      fail('read', e); setStep(quad ? 'corners' : 'camera')
-    } finally {
-      release(card?.canvas)
+      setReading(--inFlight.current)
+      fail(where, e)
     }
   }
+  const take = () => void send('take', async () => ({ blob: await stillPhoto(video.current!), kind: 'photo' }))
+  const chose = (f: File) => void send('photo', async () => ({ blob: f, kind: await kindOf(f) }))
 
-  /** The corners for a new picture: found in the full picture, else the outline seen live, else the whole frame. */
-  const took = async (canvas: HTMLCanvasElement) => {
-    const outline = seen.current
-    setStatus('Finding the card…')
-    const c = cv ?? (await scannerWithin(CV_WAIT))?.cv
-    let quad: Quad | null = null
-    if (c) {
-      try { quad = detectQuad(c, canvas, 960) ?? outline ?? frameQuad(canvas.width, canvas.height) } catch (e) { reportScan('find', e) }
-    }
-    await read(canvas, quad)
-  }
-  /** Every way a picture arrives runs here, so nothing it does can fail without saying so. */
-  const picture = async (step: string, get: () => HTMLCanvasElement | Promise<HTMLCanvasElement>) => {
-    setError(null); setNote(null)
-    try { await took(await get()) } catch (e) { fail(step, e) }
-  }
-
-  const save = async () => {
-    if (!draft || saving) return
-    setSaving(true)
+  /** Read the current draft again, from the picture still on this phone: as the other kind, or from dragged corners. */
+  const again = async (kind: ScanKind, from?: number[]) => {
+    const d = current, p = d && pictures.current.get(d.id)
+    if (!d || !p) return
+    setError(null); setStatus(kind === 'screenshot' ? 'Reading it as a screenshot…' : 'Squaring the card up and reading it…')
     try {
+      const r = await readScan(p.blob, kind, { replaces: d.id, corners: from, onWait: waiting })
+      setStatus(null); setDrafts(queue.current.map((x) => (x.id === r.id ? r : x))); check(r)
+    } catch (e) { fail('again', e) }
+  }
+
+  const mark = (style: string) => {
+    if (!current || !selection) return
+    const snapped = snapChars(current.body, selection[0], selection[1])
+    window.getSelection()?.removeAllRanges(); setSelection(null)
+    if (!snapped) return
+    const [a, b] = snapped
+    if (current.spans.some((s) => s.style === style && s.start_char === a && s.end_char === b)) return
+    const span: SpanRec = { label: style, key: 'sc', style, start_char: a, end_char: b, src: 'manual' }
+    setCurrent({ ...current, spans: [...current.spans, span].sort((x, y) => x.start_char - y.start_char || y.end_char - x.end_char) })
+  }
+  const unmark = (s: SpanRec) => {
+    if (!current) return
+    setActive(null)
+    setCurrent({ ...current, spans: current.spans.filter((x) => spanKey(x) !== spanKey(s)) })
+  }
+  const pick = (spans: SpanRec[]) => {
+    if (window.getSelection()?.isCollapsed === false || !spans.length) return
+    const i = active ? spans.findIndex((s) => spanKey(s) === spanKey(active)) : -1
+    setActive(spans[(i + 1) % spans.length])
+  }
+
+  useEffect(() => {
+    if (step !== 'check') return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t?.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return
+      const label = MARKS.find((l) => l.hotkey === e.key)
+      if (label && selection) { e.preventDefault(); mark(label.style); return }
+      if ((e.key === 'Backspace' || e.key === 'Delete') && active) { e.preventDefault(); unmark(active) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
+  /** Approve: the draft's tag, cite and marks go to the server, the words become a source and the card is cut from it
+   *  word for word, with its marks; then the draft is cleared. */
+  const save = async () => {
+    const d = current
+    if (!d || saving) return
+    setSaving(true); setError(null)
+    try {
+      // The server keeps the approved tag, cite and marks, and says what the source's text now is.
+      const ok = await editDraft(d.id, { tag: d.tag, cite: d.cite, spans: d.spans.map((s) => ({ style: s.style, start_char: s.start_char, end_char: s.end_char })) })
       const topic = await require()
-      const title = draft.tag.trim() || 'Scanned card'
-      const source = await createSource({ text: draft.text, title, cite: draft.cite })
+      const title = ok.tag.trim() || 'Scanned card'
+      const source = await createSource({ text: ok.text, title, cite: ok.cite })
       // The marks count characters of the body; a card made from the whole text (no body read) has none.
-      onSaved(await createCard({ text: draft.body || draft.text, title, cite: draft.cite, source, topic, spans: draft.body ? draft.spans : [] }))
+      const card = await createCard({ text: ok.body || ok.text, title, cite: ok.cite, source, topic, spans: ok.body ? ok.spans : [] })
+      await discardDraft(d.id).catch((e) => reportScan('clear', e)) // the card is saved; a draft left over can be discarded
+      setDrafts(queue.current.filter((x) => x.id !== d.id))
+      onSaved(card)
     } catch (e) { setError((e as Error).message) } finally { setSaving(false) }
   }
+  const discard = async () => {
+    const d = current
+    if (!d) return
+    try {
+      await discardDraft(d.id)
+      const rest = queue.current.filter((x) => x.id !== d.id)
+      setDrafts(rest); setCurrent(null)
+      if (rest.length) setStep('queue')
+      else void camera()
+    } catch (e) { fail('discard', e) }
+  }
 
-  const v = video.current
+  const waitingCount = drafts.length
+  const strip = (reading > 0 || waitingCount > 0) && (
+    <p className="row">
+      <span>{reading > 0 ? `Reading ${reading === 1 ? 'a card' : `${reading} cards`}…` : ''}{reading > 0 && waitingCount > 0 ? ' · ' : ''}
+        {waitingCount > 0 ? `${waitingCount} to check` : ''}</span>
+      {waitingCount > 0 && <button className="link spacer" onClick={() => { if (waitingCount === 1) check(drafts[0]); else { stop(); setStep('queue') } }}>check {waitingCount === 1 ? 'it' : 'them'}</button>}
+    </p>
+  )
+  const d = current
+  const kept = d ? pictures.current.has(d.id) : false
   return (
     <dialog ref={ref} className="sheet" onCancel={onClose}>
       <div className="sheet-inner stack">
         <div className="row">
-          <h1>Scan a card</h1>
+          <h1>{step === 'camera' ? 'Scan a card' : step === 'queue' ? 'Scans to check' : step === 'corners' ? 'The card’s corners' : 'Check the scan'}</h1>
           <button className="link spacer" onClick={onClose}>close</button>
         </div>
         {error && <p className="error">{error}</p>}
         {status && <p className="note" role="status">{status}</p>}
-        {note && !error && <p className="note">{note}</p>}
         {step === 'camera' && (
           <div className="stack">
             <div className="scan-frame" style={{ display: live ? 'block' : 'none' }}>
               <video ref={video} playsInline muted autoPlay />
-              {!!v?.videoWidth && box && (
-                <svg viewBox={`0 0 ${v.videoWidth} ${v.videoHeight}`} preserveAspectRatio="xMidYMid meet" aria-hidden>
-                  <polygon points={box.map((p) => `${p.x},${p.y}`).join(' ')} />
-                </svg>
-              )}
             </div>
-            {live && <button className="action" disabled={!!status && status !== 'Starting the scanner…'}
-              onClick={() => void picture('take', () => still(video.current!))}>take the picture</button>}
-            <PhotoPick take={!live} onPhoto={(f) => { setStatus('Opening the photo…'); void picture('photo', () => photoCanvas(f)) }} />
-            <p>Lay the card flat in good light. Scythe finds its corners and squares it up before reading it. The photo goes to your team’s server to be read, and isn’t kept.</p>
+            {live && <button className="action" onClick={take}>take the picture</button>}
+            <PhotoPick take={!live} onPhoto={chose} />
+            {strip}
+            <p>Lay the card flat in good light, or choose a screenshot. Your team’s server squares a photo up to the card’s corners and reads it; a screenshot it reads as it is. Neither is kept: only the words wait for you to check.</p>
           </div>
         )}
-        {step === 'corners' && photo && (
+        {step === 'queue' && (
           <div className="stack">
-            <p>Drag the corners onto the card’s.</p>
-            <Corners image={photo.canvas} quad={photo.quad} onChange={(quad) => setPhoto({ ...photo, quad })} />
+            {reading > 0 && <p className="note">Reading {reading === 1 ? 'a card' : `${reading} cards`}…</p>}
+            {drafts.length === 0 && reading === 0 && <p>Nothing to check.</p>}
+            <ul className="scan-queue">
+              {drafts.map((x) => (
+                <li key={x.id}>
+                  <button className="link" onClick={() => check(x)}>{preview(x)}</button>
+                  <span className="note"> · {x.kind === 'screenshot' ? 'screenshot' : 'photo'} · {ago(x.created_at)}</span>
+                </li>
+              ))}
+            </ul>
+            {scanner && <p><button className="link" onClick={() => void camera()}>scan another</button></p>}
+          </div>
+        )}
+        {step === 'check' && d && (
+          <div className="stack">
+            <p className="note">{d.kind === 'screenshot' ? 'Read as a screenshot.' : 'Squared up from a photo of paper.'}
+              {kept && <> <button className="link" onClick={() => void again(d.kind === 'screenshot' ? 'photo' : 'screenshot')}>
+                read it as a {d.kind === 'screenshot' ? 'photo' : 'screenshot'} instead</button></>}</p>
+            <input className="field" style={{ fontWeight: 600 }} placeholder="Tag" maxLength={300} value={d.tag} onChange={(e) => setCurrent({ ...d, tag: e.target.value })} />
+            <input className="field" placeholder="Cite" maxLength={2000} value={d.cite} onChange={(e) => setCurrent({ ...d, cite: e.target.value })} />
             <div className="row">
-              <button className="action" onClick={() => void read(photo.canvas, photo.quad)}>read it again</button>
-              <button className="link spacer" onClick={() => void start()}>take it again</button>
+              {MARKS.map((l) => (
+                <button key={l.name} className="link" disabled={!selection} onMouseDown={(e) => e.preventDefault()} onClick={() => mark(l.style)}>
+                  {l.hotkey && <kbd>{l.hotkey}</kbd>} {l.name}
+                </button>
+              ))}
+              {active && <button className="link spacer" onClick={() => unmark(active)}>remove {active.style}</button>}
             </div>
-          </div>
-        )}
-        {step === 'reading' && !status && <p>Reading the card… this takes a few seconds.</p>}
-        {step === 'draft' && draft && (
-          <div className="stack">
-            {preview && <img className="scan-preview" src={preview} alt="The card, squared up" />}
-            <input className="field" style={{ fontWeight: 600 }} placeholder="Tag" maxLength={1000} value={draft.tag} onChange={(e) => setDraft({ ...draft, tag: e.target.value })} />
-            <input className="field" placeholder="Cite" maxLength={2000} value={draft.cite} onChange={(e) => setDraft({ ...draft, cite: e.target.value })} />
             {/* The marks on the paper, retold as Scythe's underlines over the same words (a highlighter's is the heavy one). */}
-            <div className="scan-body"><TokenText text={draft.body} spans={draft.spans ?? []} /></div>
-            <p>These are the words as read from the photo{draft.spans?.length ? ', its marks underlined' : ''}. If one is misread, take the picture again: the card keeps the words exactly.</p>
+            <div className="scan-body">
+              <TokenText text={d.body} spans={d.spans} editable mark={selection} activeKey={active ? spanKey(active) : null}
+                onSelect={(r) => { const s = r ? snapChars(d.body, r[0], r[1]) : null; setSelection(s); if (s) setActive(null) }} onSpanClick={pick} />
+            </div>
+            <p>These are the words as read{d.spans.length ? ', with their marks' : ''}. Select words to underline, highlight or emphasize them; tap a mark to remove it. If a word is misread, take it again: the card keeps the words exactly.</p>
             <div className="row">
               <button className="action" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save card'}</button>
-              {photo && <button className="link" onClick={() => setStep('corners')}>adjust the corners</button>}
-              <button className="link spacer" onClick={() => void start()}>take it again</button>
+              {d.kind === 'photo' && kept && <button className="link" onClick={() => { setCorners(d.corners ?? [0, 0, 1, 0, 1, 1, 0, 1]); setStep('corners') }}>adjust the corners</button>}
+              <button className="link" onClick={() => void discard()}>discard</button>
+              {drafts.length > 1 && <button className="link spacer" onClick={() => setStep('queue')}>all scans</button>}
+              {scanner && drafts.length <= 1 && <button className="link spacer" onClick={() => void camera()}>scan another</button>}
+            </div>
+          </div>
+        )}
+        {step === 'corners' && d && corners && pictureUrl(d.id) && (
+          <div className="stack">
+            <p>Drag the corners onto the card’s.</p>
+            <Corners src={pictureUrl(d.id)!} corners={corners} onChange={setCorners} />
+            <div className="row">
+              <button className="action" onClick={() => void again('photo', corners)}>read it again</button>
+              <button className="link spacer" onClick={() => setStep('check')}>back</button>
             </div>
           </div>
         )}
@@ -227,31 +295,34 @@ export default function Scan({ open, onClose, onSaved }: { open: boolean; onClos
   )
 }
 
-/** The picture with the card's four corners, each draggable. */
-function Corners({ image, quad, onChange }: { image: HTMLCanvasElement; quad: Quad; onChange: (q: Quad) => void }) {
+/** The picture with the card's four corners (fractions of the upright picture), each draggable. */
+function Corners({ src, corners, onChange }: { src: string; corners: number[]; onChange: (c: number[]) => void }) {
   const svg = useRef<SVGSVGElement>(null)
-  const [src] = useState(() => image.toDataURL('image/jpeg', 0.8))
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null)
   const [drag, setDrag] = useState<number | null>(null)
-  const r = Math.max(image.width, image.height) / 40
+  const pts = size ? [0, 1, 2, 3].map((i) => ({ x: corners[2 * i] * size.w, y: corners[2 * i + 1] * size.h })) : []
+  const r = size ? Math.max(size.w, size.h) / 40 : 0
 
-  const at = (e: React.PointerEvent): Pt | null => {
+  const at = (e: React.PointerEvent): { x: number; y: number } | null => {
     const m = svg.current?.getScreenCTM()
-    if (!m) return null
+    if (!m || !size) return null
     const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse())
-    return { x: Math.min(Math.max(p.x, 0), image.width), y: Math.min(Math.max(p.y, 0), image.height) }
+    return { x: Math.min(Math.max(p.x / size.w, 0), 1), y: Math.min(Math.max(p.y / size.h, 0), 1) }
   }
 
   return (
     <div className="scan-frame">
-      <img src={src} alt="The picture" />
-      <svg ref={svg} viewBox={`0 0 ${image.width} ${image.height}`} preserveAspectRatio="xMidYMid meet"
-        onPointerMove={(e) => { if (drag === null) return; const p = at(e); if (p) onChange(quad.map((q, i) => (i === drag ? p : q)) as Quad) }}
-        onPointerUp={() => setDrag(null)} onPointerCancel={() => setDrag(null)}>
-        <polygon points={quad.map((p) => `${p.x},${p.y}`).join(' ')} />
-        {quad.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={r} onPointerDown={(e) => { (e.target as Element).setPointerCapture(e.pointerId); setDrag(i) }} />
-        ))}
-      </svg>
+      <img src={src} alt="The picture" onLoad={(e) => setSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
+      {size && (
+        <svg ref={svg} viewBox={`0 0 ${size.w} ${size.h}`} preserveAspectRatio="xMidYMid meet"
+          onPointerMove={(e) => { if (drag === null) return; const p = at(e); if (p) onChange(corners.map((v, i) => (i === 2 * drag ? p.x : i === 2 * drag + 1 ? p.y : v))) }}
+          onPointerUp={() => setDrag(null)} onPointerCancel={() => setDrag(null)}>
+          <polygon points={pts.map((p) => `${p.x},${p.y}`).join(' ')} />
+          {pts.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r={r} onPointerDown={(e) => { (e.target as Element).setPointerCapture(e.pointerId); setDrag(i) }} />
+          ))}
+        </svg>
+      )}
     </div>
   )
 }
