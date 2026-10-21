@@ -39,6 +39,7 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
   // The brief being scanned: its name as typed, and the brief itself once the first page is sent under it.
   const [briefName, setBriefName] = useState('')
   const brief = useRef<Brief | null>(null)
+  const briefComing = useRef<Promise<Brief> | null>(null) // one brief, however quickly its first pages are chosen
   const nextOrdinal = useRef(1)
   // The pages sent from here (and their reading, as the server reports it), the uploads still on their way, and the
   // queue as the server has it: the cards waiting, and every brief's progress.
@@ -111,7 +112,7 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
     if (open && !d.open) {
       d.showModal()
       setCards([]); setBriefs([]); setCurrent(null); setPages(new Map()); inFlight.current = 0; setSending(0)
-      brief.current = null; nextOrdinal.current = 1; setBriefName('')
+      brief.current = null; briefComing.current = null; nextOrdinal.current = 1; setBriefName('')
       refresh().catch((e) => fail('queue', e))
       if (start === 'camera' && scanner) void camera()
       else setStep('queue')
@@ -144,10 +145,10 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
     try {
       const done = await waitForPage(page.id, notePage)
       const cs = await refresh()
+      // A page read with nothing else waiting opens its first card; with other cards waiting, the strip says so.
       if (done.status === 'read' && !done.brief && inFlight.current === 0 && step !== 'check') {
         const mine = cs.filter((c) => done.cards.includes(c.id))
         if (mine.length && cs.length === mine.length) check(mine[0])
-        else if (mine.length) { stop(); setStep('queue') }
       }
     } catch (e) { fail('page', e) }
   }
@@ -160,8 +161,8 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
       const { blob, kind } = await get()
       const name = briefName.trim()
       if (name && !brief.current) {
-        brief.current = await whileSending(() => createBrief(name))
-        nextOrdinal.current = 1
+        briefComing.current ??= createBrief(name).then((b) => { brief.current = b; nextOrdinal.current = 1; return b })
+        await briefComing.current
       }
       const b = name ? brief.current : null
       const ordinal = b ? nextOrdinal.current++ : undefined
@@ -177,7 +178,6 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
       fail(where, e)
     }
   }
-  const whileSending = async <T,>(f: () => Promise<T>) => f()
   const take = () => void send('take', async () => ({ blob: await stillPhoto(video.current!), kind: 'photo' }))
   const chose = (f: File) => void send('photo', async () => ({ blob: f, kind: await kindOf(f) }))
 

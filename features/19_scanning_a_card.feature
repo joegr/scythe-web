@@ -58,12 +58,12 @@ Feature: Scanning a printed card
     When I discard the scans
     Then nothing waits to be checked
 
-  @missing @phone @signed-in @ocr
+  @built @phone @signed-in @ocr
   Scenario: A page with two cards gives two cards to check
     Given I am signed in to the team's evidence
     When I scan a screenshot of a page with two cards
     Then 2 cards wait to be checked
-    And the cards to check are tagged "Soot blocks sunlight" and "Fires start winter"
+    And the cards to check are tagged "Nuclear war causes global famine" and "Fires start winter"
 
   @built @signed-in @mvp @ocr
   Scenario: A photo of a page becomes a source
