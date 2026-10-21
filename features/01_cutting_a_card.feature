@@ -101,14 +101,14 @@ Feature: Cutting a card from a source
     And the server refuses to change the card's words
 
   @built @signed-in @mvp
-  Scenario: A card is at most 100 words
-    A card is a short span of an author's words. The reader counts the words picked; past 100 it says so and
+  Scenario: A card is at most 400 words
+    A card is a short span of an author's words. The reader counts the words picked; past 400 it says so and
     won't cut, and the server refuses a longer card from any app (413).
-    Given a pasted source "Long study <run>" of 300 words
+    Given a pasted source "Long study <run>" of 600 words
     When I open that source in the reader
-    And I find the source's first 101 words
+    And I find the source's first 401 words
     And I write the tag "Too long <run>"
-    Then I see "101 of 100 words: too long for a card"
+    Then I see "401 of 400 words: too long for a card"
     And the cut button is disabled
 
   @built @signed-in @mvp

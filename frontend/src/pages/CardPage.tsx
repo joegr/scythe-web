@@ -183,6 +183,8 @@ export default function CardPage() {
 
       <section className="row">
         {card.meta.source && <button className="link" onClick={() => setReader(true)}>source #{card.meta.source}</button>}
+        {card.brief && <Link className="link" to={`/search?brief=${encodeURIComponent(card.brief.name)}`}>
+          from {card.brief.name}, {card.brief.pages.length > 1 ? `pages ${card.brief.pages.join('–')}` : `page ${card.brief.pages[0]}`}</Link>}
         <Link className="link" to={`/print/${card.number}`}>print</Link>
         {editable && !removing && <button className="link spacer" onClick={() => setRemoving(true)}>remove</button>}
       </section>

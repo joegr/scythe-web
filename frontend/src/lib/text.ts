@@ -121,8 +121,9 @@ export function checkDate(raw: string): { date: string | null } | { error: strin
 
 // ---------------------------------------------------------------- how much goes in (the server holds the same limits)
 
-/** A card is a short span of an author's words; a source is the article it's cut from; one source gives ten cards. */
-export const WORDS = { card: 100, source: 20_000 }
+/** A card is a short span of an author's words; a source is the article it's cut from; one source gives ten cards.
+ *  A scanned page is read into cards at once, so it holds a few cards' worth at most. */
+export const WORDS = { card: 400, source: 20_000, page: 1000 }
 export const CARDS_PER_SOURCE = 10
 
 /** Words as the server counts them: runs of non-space characters. */

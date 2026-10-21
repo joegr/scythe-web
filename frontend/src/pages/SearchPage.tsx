@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Autocomplete from '../components/Autocomplete'
 import CardView from '../components/CardView'
 import { useDebounced } from '../lib/hooks'
-import { NSDA_TOPICS, searchCards, searchPerson, type Found, type SearchSort } from '../lib/store'
+import { listCards, NSDA_TOPICS, searchCards, searchPerson, type Found, type SearchSort } from '../lib/store'
 import { dateWords, monthOf } from '../lib/text'
 import { topicLabel } from '../lib/topic'
 
@@ -39,6 +39,7 @@ export default function SearchPage() {
   const sort = (SORTS.find(([s]) => s === params.get('sort'))?.[0] ?? 'best') as SearchSort
   const month = MONTH.test(params.get('month') ?? '') ? params.get('month') : null
   const person = params.get('person')
+  const brief = params.get('brief')
   const dq = useDebounced(q, 250)
   const [results, setResults] = useState<Found[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -60,11 +61,13 @@ export default function SearchPage() {
     setResults(null)
     const run = person
       ? searchPerson(person).then((cards) => cards.map((card) => ({ card, match: null })))
-      : searchCards(dq, { topic, approved: view === 'approved', archived: view === 'removed', sort, month, signal: ctl.signal })
+      : brief
+        ? listCards({ brief, archived: view === 'removed', approved: view === 'approved' ? true : null, limit: 500 }).then((cards) => cards.map((card) => ({ card, match: null })))
+        : searchCards(dq, { topic, approved: view === 'approved', archived: view === 'removed', sort, month, signal: ctl.signal })
     run.then((r) => { if (!ctl.signal.aborted) setResults(r) })
       .catch((e) => { if (!ctl.signal.aborted) setError(e.message) })
     return () => ctl.abort()
-  }, [dq, topic, view, sort, month, person])
+  }, [dq, topic, view, sort, month, person, brief])
 
   const set = (changes: Record<string, string | null>) => setParams((p) => {
     for (const [k, v] of Object.entries(changes)) { if (v === null) p.delete(k); else p.set(k, v) }
@@ -107,18 +110,19 @@ export default function SearchPage() {
             ))}
           </span>
         </div>
-        {(topic || month || person) && (
+        {(topic || month || person || brief) && (
           <div className="row">
             {topic && <span>In {topicInfo ? `${topicLabel(topicInfo)}: ${topicInfo.resolution}` : topic}{' '}
               <button className="link" onClick={() => set({ topic: null })}>clear</button></span>}
             {month && <span>Published {dateWords(month)} <button className="link" onClick={() => set({ month: null })}>clear</button></span>}
             {person && <span>By or naming {person} <button className="link" onClick={() => set({ person: null })}>clear</button></span>}
+            {brief && <span>Scanned from {brief}, in page order <button className="link" onClick={() => set({ brief: null })}>clear</button></span>}
           </div>
         )}
       </div>
       {error && <p className="error">{error}</p>}
       {/* Each view gets its own list, so nothing from the last one lingers while the next loads. */}
-      <div className="content stack" key={`${view}|${sort}|${month}|${topic}|${person}`}>
+      <div className="content stack" key={`${view}|${sort}|${month}|${topic}|${person}|${brief}`}>
         {results === null && !error && <p>Searching…</p>}
         {results && <p>{count(results, view)}</p>}
         {results?.map((f, i) => {
