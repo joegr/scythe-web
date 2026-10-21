@@ -1,0 +1,32 @@
+# The open-source client: lint, typecheck and build the web app on every push. A team's server builds
+# this client into its own image, and the server's checks run the features here in a browser.
+name: client
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:  # the topics workflow starts it on its branch
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: ./node_modules/.bin/eslint src
+      - run: npm run build
+
+  # scripts/: the NSDA topics refresh (topics.yml). Stdlib Python, no installs.
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s scripts

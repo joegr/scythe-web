@@ -1,0 +1,188 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap');
+
+/* One family, one size, one ink. Hierarchy comes from weight and space only; card formatting is
+   drawn exclusively with underlines (thin = underline, heavy = highlight, double = emphasis).
+   Controls are solid square buttons with no edge at rest; the pointer gives them a darker fill and an ink edge. */
+:root {
+  --paper: #fbfaf7;
+  --ink: #16171a;
+  --rule: #dedbd3;
+  --accent: #2f5d62;
+  --size: 18px;
+  --leading: 1.65;
+  --measure: 40rem;
+  --font: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --button: #eeebe4;
+  --button-on: #dedbd3;
+  --button-hover: #d3cfc4;
+  --disabled-edge: #85827a; /* 3.6:1 on paper, so an unavailable button still shows its edge */
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: var(--size); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 400 1rem/var(--leading) var(--font);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+h1, h2, h3, h4, p, ul, ol, pre, figure { margin: 0; }
+h1, h2, h3, h4, strong, b { font-size: 1rem; font-weight: 600; }
+button, input, select, textarea { font: inherit; color: inherit; }
+::placeholder { color: var(--ink); opacity: 1; font-style: italic; }
+::selection { background: rgba(47, 93, 98, .22); }
+
+/* Links in running text: a thin ink underline set slightly lower than card formatting. Controls are buttons, below. */
+a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .3em; text-decoration-color: var(--ink); }
+a:hover { text-decoration-thickness: 2px; }
+
+/* ---------- layout ---------- */
+.page { max-width: var(--measure); margin: 0 auto; padding: 0 1rem 6rem; }
+.top { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: 1.5rem 0 3rem; }
+.top .brand { font-weight: 600; text-decoration: none; margin-right: auto; }
+.stack > * + * { margin-top: 3rem; }
+.gap > * + * { margin-top: 1rem; }
+.row { display: flex; flex-wrap: wrap; gap: .5rem .6rem; align-items: baseline; }
+.spacer { margin-left: auto; }
+.center { text-align: center; }
+.section { margin-top: 3.5rem; }
+
+/* ---------- buttons: solid and square, no edge until the pointer is on them ----------
+   .link is an ordinary button, .on a chosen one, .action the one that does the page's work.
+   The top bar and a card's meta line are buttons too. Under the pointer a button darkens and takes an ink edge. */
+.link, .action, .top a:not(.brand), .card-meta a {
+  display: inline-flex; align-items: center; gap: .4em; vertical-align: baseline;
+  padding: .15rem .8rem; border: 1px solid transparent; border-radius: 0;
+  background: var(--button); color: var(--ink); text-decoration: none; text-align: left; cursor: pointer;
+  transition: background-color .12s, border-color .12s, color .12s;
+}
+/* Chosen: a heavy ink bar along the foot, as the old heavy underline was; it stays under hover. */
+.link.on, .top a.active { background: var(--button-on); box-shadow: inset 0 -3px 0 var(--ink); }
+.link:hover:not(:disabled), .top a:not(.brand):hover, .card-meta a:hover { background: var(--button-hover); border-color: var(--ink); }
+.link:active:not(:disabled), .top a:not(.brand):active, .card-meta a:active { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.action { background: var(--ink); color: var(--paper); font-weight: 600; }
+.action:hover:not(:disabled) { background: #33353a; border-color: var(--ink); color: var(--paper); }
+.action:active:not(:disabled) { background: var(--ink); color: var(--paper); }
+.link:disabled, .action:disabled { cursor: not-allowed; background: transparent; box-shadow: none; color: var(--ink); border: 1px dashed var(--disabled-edge); }
+.link:focus-visible, .action:focus-visible, .top a:focus-visible, .card-meta a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.field { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--rule); padding: .35rem 0; outline: none; }
+.field:focus { border-bottom-color: var(--ink); }
+textarea.field { resize: vertical; border: 1px solid var(--rule); padding: .6rem .75rem; }
+textarea.field:focus { border-color: var(--ink); }
+select.field { appearance: none; cursor: pointer; }
+.error { border-left: 2px solid #9b2c2c; padding-left: .75rem; }
+.note { border-left: 2px solid var(--rule); padding-left: .75rem; }
+kbd { font: inherit; border-bottom: 1px solid var(--ink); }
+
+/* ---------- the card ---------- */
+.card { border-top: 1px solid var(--rule); padding-top: 1.25rem; }
+.card-tag { font-weight: 600; }
+.card-tag a { text-decoration: none; }
+.card-tag a:hover { text-decoration: underline; }
+.card-tag input { font-weight: 600; }
+.card-cite { margin-top: .15rem; }
+.card-cite strong { font-weight: 600; }
+.card-body { margin-top: 1rem; }
+.card-meta { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: .5rem .6rem; align-items: baseline; }
+
+.token-text p + p { margin-top: .9rem; }
+.token-text.editable { cursor: text; }
+.t-u, .t-hl, .t-em { text-decoration-line: underline; text-decoration-color: var(--ink); text-underline-offset: .22em; text-decoration-skip-ink: none; }
+.t-u { text-decoration-thickness: 1px; }
+.t-hl { text-decoration-thickness: 3px; }
+.t-em { text-decoration-style: double; text-decoration-thickness: 1px; }
+.t-hl.t-em { text-decoration-thickness: 2px; }
+.t-custom { text-decoration-line: underline; text-decoration-thickness: 2px; text-underline-offset: .22em; }
+.t-ner { text-decoration: underline dotted var(--ink); text-underline-offset: .3em; }
+/* A suggestion waiting for a yes: dotted, so it never reads as the team's own mark. */
+.t-suggested { text-decoration: underline dotted var(--ink); text-decoration-thickness: 2px; text-underline-offset: .22em; text-decoration-skip-ink: none; }
+.t-active { text-decoration-color: var(--accent) !important; }
+.t-mark { text-decoration: underline wavy var(--accent); text-underline-offset: .25em; }
+.token-text [data-span] { cursor: pointer; }
+.md { white-space: pre-wrap; word-break: break-word; font: inherit; }
+
+/* ---------- reader ---------- */
+dialog.sheet { border: 0; padding: 0; margin: 0; width: 100%; max-width: none; height: 100%; max-height: none;
+  background: var(--paper); color: var(--ink); }
+dialog.sheet::backdrop { background: var(--paper); }
+.sheet-inner { max-width: var(--measure); margin: 0 auto; padding: 1.5rem 1rem 12rem; }
+.reader-text p + p { margin-top: 1rem; }
+/* The cut tooltip over the selected words: on hover, and always on a touch screen. */
+.reader-text { position: relative; }
+.cut-tip { position: absolute; transform: translateY(calc(-100% - .35rem)); visibility: hidden; z-index: 2;
+  background: var(--paper); border: 1px solid var(--ink); padding: .2rem .45rem; line-height: 1.2; }
+.cut-tip .action { padding: .15rem .6rem; }
+.reader-text:has(.reader-sel:hover) .cut-tip, .cut-tip:hover, .cut-tip:focus-within { visibility: visible; }
+@media (hover: none) { .cut-tip { visibility: visible; } }
+.reader-sel { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: .22em; }
+.cut-bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--paper); border-top: 1px solid var(--rule); }
+.cut-bar .inner { max-width: var(--measure); margin: 0 auto; padding: 1rem; }
+
+/* ---------- lists ---------- */
+.list { list-style: none; padding: 0; }
+.list > li { padding: .55rem 0; border-top: 1px solid var(--rule); }
+.list > li:first-child { border-top: 0; }
+.list button.link { max-width: 100%; }
+
+/* ---------- print (from canonical Markdown) ---------- */
+.print-sheet h1, .print-sheet h3 { margin: 2rem 0 1rem; }
+.print-sheet h4 { margin: 2rem 0 .15rem; }
+.print-sheet p { margin-top: .75rem; }
+.print-sheet h4 + p { margin-top: 0; }
+.print-sheet u, .print-sheet mark, .print-sheet strong { background: none; color: inherit; font-weight: inherit;
+  text-decoration-line: underline; text-decoration-color: var(--ink); text-underline-offset: .22em; text-decoration-skip-ink: none; }
+.print-sheet u { text-decoration-thickness: 1px; }
+.print-sheet mark { text-decoration-thickness: 3px; }
+.print-sheet strong { text-decoration-style: double; }
+.print-sheet h4 + p strong { text-decoration: none; font-weight: 600; }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+  .page { max-width: none; padding: 0; }
+}
+
+/* A row that is one choice (a topic): a whole-width button. */
+.link.plain { display: block; width: 100%; padding: .45rem .8rem; }
+label { display: block; margin-top: 1rem; }
+label.link { display: inline-flex; margin-top: 0; }
+code { font: inherit; }
+
+/* ---------- scan ---------- */
+/* The camera or the picture, with the card's outline drawn over it in the image's own pixels. */
+.scan-frame { position: relative; line-height: 0; background: var(--ink); touch-action: none; }
+.scan-frame video, .scan-frame img { width: 100%; height: auto; max-height: 70vh; object-fit: contain; display: block; }
+.scan-frame svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.scan-frame polygon { fill: rgba(47, 93, 98, .18); stroke: var(--paper); stroke-width: 4; vector-effect: non-scaling-stroke; }
+.scan-frame circle { fill: var(--paper); stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; cursor: grab; }
+.scan-preview { width: 100%; height: auto; border: 1px solid var(--rule); }
+
+/* Autocomplete: suggestions under a field; each is a button-like row, the arrowed one drawn as chosen. */
+.ac { position: relative; }
+.ac-field { flex-wrap: nowrap; }
+.ac-field .field { flex: 1; }
+.ac-list { margin: 0; border-bottom: 1px solid var(--rule); }
+.ac-list > li { cursor: pointer; padding-left: .8rem; padding-right: .8rem; transition: background-color .15s; }
+.ac-list > li:hover { background: var(--button); }
+/* The arrowed row, which Enter takes: the chosen look, and it outranks a row under the pointer. */
+.ac-list > li[aria-selected="true"] { background: var(--button-on); box-shadow: inset 3px 0 0 var(--ink); }
+.ac-list > li.ac-none { cursor: default; font-style: italic; background: none; }
+.ac-detail { display: block; }
+.month { margin-top: 2.5rem; }
+
+/* ---------- signed out: the landing's banner, the wordmark and the undertaker (lib/undertaker.js) ----------
+   As on scythe-landing/site/styles.css: loud through ink, weight and rules, never through type size; the one large
+   type is the wordmark, and the undertaker strolls along its letters. */
+.banner { position: relative; overflow: hidden; background: var(--ink); color: var(--paper); padding-bottom: 4rem; margin-bottom: 3rem; }
+.banner a { color: var(--paper); text-decoration-color: var(--paper); }
+.banner .top { padding-bottom: 0; }
+.wordmark {
+  font: 600 clamp(36px, 8vw, 72px)/1 var(--font);
+  text-transform: lowercase; letter-spacing: .06em;
+  color: var(--paper); position: relative; z-index: 1;
+  /* Headroom above the letters: the undertaker stands on them, hat, scythe blade and all. */
+  padding: 10rem 0 2rem;
+}
+.undertaker { position: absolute; left: 0; top: 0; width: 100%; display: block; pointer-events: none; z-index: 2; }
+.undertaker .stroke { fill: none; stroke: var(--paper); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.undertaker .stroke.thin { stroke-width: 1.4; }
+.undertaker .solid { fill: var(--paper); stroke: none; }

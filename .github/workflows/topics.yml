@@ -1,0 +1,55 @@
+# Refresh api/nsda_topics.json from https://www.speechanddebate.org/topics/ (scripts/nsda_topics.py). The script only
+# adds: if a topic the file has is gone from the page, the run fails and names it. A change goes to the topics-refresh
+# branch and a pull request, with this run's own token: the page and the file are both public, so it needs no secret.
+# Teams' servers seed the merged file on their next deploy.
+name: topics
+
+on:
+  schedule:
+    - cron: "43 6 2 * *"  # monthly
+  workflow_dispatch:
+
+concurrency:
+  group: topics
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  refresh:
+    if: >-
+      github.repository == 'joegr/scythe-web' &&
+      (github.event_name == 'schedule' || github.triggering_actor == github.repository_owner)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the topics page
+        run: |
+          python3 -m unittest discover -s scripts
+          python3 scripts/nsda_topics.py
+      - name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.ref_name }}
+        run: |
+          branch=topics-refresh
+          [ "$BASE" = main ] || branch="$BASE"  # run by hand on a branch: refresh that branch itself
+          if git diff --quiet -- api/nsda_topics.json; then echo "The topics haven't changed."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$branch"
+          git add api/nsda_topics.json
+          git commit -q -m "topics: NSDA topics refreshed $(date -u +%F)"
+          git push -f origin "$branch"
+          if [ "$branch" = topics-refresh ]; then
+            gh pr view "$branch" >/dev/null 2>&1 || gh pr create --base main --head "$branch" \
+              --title "topics: refresh the NSDA topics" \
+              --body "Built by the topics workflow from https://www.speechanddebate.org/topics/." \
+              || { echo "::error::couldn't open the PR: allow it under Settings → Actions → General → Workflow permissions (\"Allow GitHub Actions to create and approve pull requests\")"; exit 1; }
+          fi
+          # A push made with this token starts no workflows; start the client's checks on it.
+          gh workflow run client.yml --ref "$branch"

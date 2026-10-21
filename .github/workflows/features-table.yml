@@ -1,0 +1,33 @@
+# The "Where things stand" table in features/README.md, rebuilt on main from the features' status tags. Pull requests
+# don't touch the table (it made every open PR conflict with the next merge); this commits it after each merge.
+name: features-table
+
+on:
+  push:
+    branches: [main]
+    paths: ['features/**.feature', 'features/table.mjs']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: features-table
+  cancel-in-progress: false
+
+jobs:
+  table:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node features/table.mjs
+      - name: Commit the table if it changed
+        run: |
+          git diff --quiet -- features/README.md && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git commit -m "features/README: table rebuilt from the features" -- features/README.md
+          git pull --rebase origin main
+          git push origin HEAD:main
