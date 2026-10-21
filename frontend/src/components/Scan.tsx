@@ -4,6 +4,7 @@ import { cameraSupported, closeCamera, discardDraft, editDraft, isMobile, kindOf
 import { DEFAULT_LABELS, snapChars, type SpanRec } from '../lib/doc'
 import { createCard, createSource, spanKey } from '../lib/store'
 import { useTopic } from '../lib/topic'
+import Finder from './Finder'
 import PhotoPick from './PhotoPick'
 import TokenText from './TokenText'
 
@@ -60,7 +61,7 @@ export default function Scan({ open, onClose, onSaved, start = 'camera' }:
       setLive(true); setStatus(null)
     } catch {
       setStatus(null)
-      setError('Scythe can’t use the camera here (permission refused?). Take the picture with your camera instead.')
+      setError('Scythe can’t use the camera here (permission refused?). Allow the camera for this site in your browser’s settings, or choose a photo.')
     }
   }
   const forget = () => {
@@ -231,11 +232,13 @@ export default function Scan({ open, onClose, onSaved, start = 'camera' }:
           <div className="stack">
             <div className="scan-frame" style={{ display: live ? 'block' : 'none' }}>
               <video ref={video} playsInline muted autoPlay />
+              <Finder video={video} live={live && step === 'camera'} onSteady={take} />
             </div>
             {live && <button className="action" onClick={take}>take the picture</button>}
-            <PhotoPick take={!live} onPhoto={chose} />
+            {/* The camera is Scythe's own, above: never the phone's camera app. */}
+            <PhotoPick take={false} onPhoto={chose} />
             {strip}
-            <p>Lay the card flat in good light, or choose a screenshot. Your team’s server squares a photo up to the card’s corners and reads it; a screenshot it reads as it is. Neither is kept: only the words wait for you to check.</p>
+            <p>Lay the card flat in good light, on something darker than the card, and fit it in the frame: once it holds still the picture is taken by itself. Or choose a screenshot. Your team’s server squares a photo up to the card’s corners and reads it; a screenshot it reads as it is. Neither is kept: only the words wait for you to check.</p>
           </div>
         )}
         {step === 'queue' && (
