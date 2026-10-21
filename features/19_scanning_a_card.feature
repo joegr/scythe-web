@@ -14,7 +14,7 @@ Feature: Scanning a printed card
   from it word for word, with its marks. A photo of a page (a book, a printout, a screenshot) can also become a
   source to cut from, on any device. OCR is the one model that shapes words, and only here, upstream.
 
-  @built @phone @signed-in @mvp
+  @built @phone @signed-in @mvp @ocr
   Scenario: Scan a card with the phone's camera
     Given I am signed in to the team's evidence
     When I scan a printed card with the camera
@@ -22,7 +22,7 @@ Feature: Scanning a printed card
     When I save the scanned card
     Then the card is its source's own words, as read from the photo
 
-  @built @phone @signed-in @mvp
+  @built @phone @signed-in @mvp @ocr
   Scenario: Scan a card from a saved photo
     Given I am signed in to the team's evidence
     When I scan a printed card from a saved photo
@@ -30,14 +30,14 @@ Feature: Scanning a printed card
     When I save the scanned card
     Then the card is its source's own words, as read from the photo
 
-  @built @phone @signed-in
+  @built @phone @signed-in @ocr
   Scenario: A screenshot is read as it is
     Given I am signed in to the team's evidence
     When I scan a screenshot of a card
     Then the draft says it was read as a screenshot
     And the draft has the card's tag, cite and words
 
-  @built @phone @signed-in
+  @built @phone @signed-in @ocr
   Scenario: Mark a scanned card before saving it
     Given I am signed in to the team's evidence
     When I scan a printed card from a saved photo
@@ -45,7 +45,7 @@ Feature: Scanning a printed card
     And I save the scanned card
     Then the card in git has a "highlight" span over "Soot from burning cities"
 
-  @built @phone @signed-in
+  @built @phone @signed-in @ocr
   Scenario: Scans wait to be checked
     Given I am signed in to the team's evidence
     When I scan a printed card from a saved photo
@@ -54,7 +54,7 @@ Feature: Scanning a printed card
     When I discard the scans
     Then nothing waits to be checked
 
-  @built @signed-in @mvp
+  @built @signed-in @mvp @ocr
   Scenario: A photo of a page becomes a source
     Given I am signed in to the team's evidence
     When I open a source from a photo of a page

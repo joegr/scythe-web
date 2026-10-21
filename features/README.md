@@ -52,6 +52,7 @@ Other tags:
 - `@signed-in`: the scenario needs a signed-in debater.
 - `@two-debaters`: two browsers on the same card.
 - `@slow`: waits on background work or a live article fetch, usually 1–5 minutes.
+- `@ocr`: reads a real picture, so it needs the shared OCR service (joegr/scythe-ocr) as well as a team server. Server checks skip it; the live run against a deployed team runs it, and the OCR service is tested on its own.
 
 ## Where things stand
 
