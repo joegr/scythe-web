@@ -152,6 +152,15 @@ code { font: inherit; }
 .scan-frame { position: relative; line-height: 0; background: var(--ink); touch-action: none; }
 .scan-frame video, .scan-frame img { width: 100%; height: auto; max-height: 70vh; object-fit: contain; display: block; }
 .scan-frame svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* The finder over the live camera: the frame to fit the card in, its guide line, and the card's outline once found. */
+.finder { pointer-events: none; }
+.finder-dim { fill: rgba(22, 23, 26, .45); }
+.finder-bracket { fill: none; stroke: var(--paper); stroke-width: 6; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.finder-guide { stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; opacity: .9; }
+.scan-frame .finder-card { fill: rgba(47, 93, 98, .22); stroke: var(--accent); stroke-width: 4; vector-effect: non-scaling-stroke; }
+.scan-frame .finder-card.done { stroke: var(--paper); fill: rgba(251, 250, 247, .2); }
+.finder-say { position: absolute; left: 0; right: 0; bottom: .75rem; margin: 0; text-align: center; line-height: 1.4;
+  color: var(--paper); text-shadow: 0 1px 3px rgba(0, 0, 0, .6); pointer-events: none; }
 .scan-frame polygon { fill: rgba(47, 93, 98, .18); stroke: var(--paper); stroke-width: 4; vector-effect: non-scaling-stroke; }
 .scan-frame circle { fill: var(--paper); stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; cursor: grab; }
 .scan-preview { width: 100%; height: auto; border: 1px solid var(--rule); }
@@ -187,4 +196,16 @@ code { font: inherit; }
 .undertaker .stroke.thin { stroke-width: 1.4; }
 .undertaker .solid { fill: var(--paper); stroke: none; }
 .scan-queue { list-style: none; margin: 0; padding: 0; }
+/* Checking a scan: the card as it will be saved, then the marks and Save kept at the bottom of the screen. */
+.scan-line { display: block; width: 100%; border: 0; border-bottom: 1px solid var(--rule); background: transparent; padding: .2rem 0;
+  resize: none; overflow: hidden; outline: none; line-height: inherit; }
+.scan-line:focus { border-bottom-color: var(--ink); }
+textarea.card-tag.scan-line { font-weight: 600; }
+.scan-card .card-body { margin-top: 1rem; }
+.scan-check .scan-body .token-text { font-size: 1.05rem; }
+.scan-tools { position: sticky; bottom: 0; background: var(--paper); border-top: 1px solid var(--rule); padding: .75rem 0 calc(.75rem + env(safe-area-inset-bottom)); }
+@media (max-width: 640px) {
+  .scan-check { min-height: calc(100dvh - 6rem); display: flex; flex-direction: column; }
+  .scan-check .scan-card { flex: 1; }
+}
 .scan-queue li { padding: .4em 0; border-bottom: 1px solid var(--rule); }

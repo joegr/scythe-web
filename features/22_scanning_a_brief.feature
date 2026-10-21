@@ -10,7 +10,7 @@ Feature: Scanning a brief
   restarted, or the page is too dense: a page is 1,000 words at most, a card 400) says so, and the phone sends it
   again from the picture it kept, or drops it.
 
-  @missing @phone @signed-in
+  @missing @phone @signed-in @ocr
   Scenario: Scan a brief page by page without waiting
     Given I am signed in to the team's evidence
     When I start scanning the brief "Aff v2 <run>"
@@ -18,14 +18,14 @@ Feature: Scanning a brief
     Then the scanner says "2 of 2 pages read"
     And the cards to check are grouped under "Aff v2 <run>"
 
-  @missing @phone @signed-in
+  @missing @phone @signed-in @ocr
   Scenario: A card that runs over a page break is one card
     Given I am signed in to the team's evidence
     When I start scanning the brief "Aff v2 <run>"
     And I scan 2 pages of the brief from saved photos
     Then a card to check is from pages 1 and 2 of the brief
 
-  @missing @phone @signed-in
+  @missing @phone @signed-in @ocr
   Scenario: Save the brief at once
     Given I am signed in to the team's evidence
     When I start scanning the brief "Aff v2 <run>"
@@ -34,7 +34,7 @@ Feature: Scanning a brief
     Then the cards of "Aff v2 <run>" are listed in page order
     And the card in git names the brief "Aff v2 <run>" and its pages
 
-  @missing @phone @signed-in
+  @missing @phone @signed-in @ocr
   Scenario: Split a card the server read as one
     Given I am signed in to the team's evidence
     When I scan a printed card from a saved photo

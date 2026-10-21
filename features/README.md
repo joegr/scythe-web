@@ -52,6 +52,7 @@ Other tags:
 - `@signed-in`: the scenario needs a signed-in debater.
 - `@two-debaters`: two browsers on the same card.
 - `@slow`: waits on background work or a live article fetch, usually 1–5 minutes.
+- `@ocr`: reads a real picture, so it needs the shared OCR service (joegr/scythe-ocr) as well as a team server. Server checks skip it; the live run against a deployed team runs it, and the OCR service is tested on its own.
 
 ## Where things stand
 
@@ -77,10 +78,10 @@ The table is rebuilt on `main` after every merge (`.github/workflows/features-ta
 | `16_card_history_and_removing.feature` | 1 | 2 | 2 |
 | `17_two_debaters_one_card.feature` | 4 | 2 | 0 |
 | `18_searching_printing_and_copying.feature` | 11 | 0 | 0 |
-| `19_scanning_a_card.feature` | 4 | 0 | 0 |
+| `19_scanning_a_card.feature` | 7 | 0 | 0 |
 | `20_writing_a_case.feature` | 12 | 0 | 0 |
 | `21_joining_a_team.feature` | 5 | 0 | 0 |
-| **All 21** | **113** | **23** | **10** |
+| **All 21** | **116** | **23** | **10** |
 
 ## Running them
 

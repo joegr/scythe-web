@@ -18,7 +18,7 @@ Feature: Scanning a printed card
   one model that shapes words, and only here, upstream. A whole brief is scanned the same way, page after page: see
   "Scanning a brief".
 
-  @built @phone @signed-in @mvp
+  @built @phone @signed-in @mvp @ocr
   Scenario: Scan a card with the phone's camera
     Given I am signed in to the team's evidence
     When I scan a printed card with the camera
@@ -26,7 +26,7 @@ Feature: Scanning a printed card
     When I save the scanned card
     Then the card is its source's own words, as read from the photo
 
-  @built @phone @signed-in @mvp
+  @built @phone @signed-in @mvp @ocr
   Scenario: Scan a card from a saved photo
     Given I am signed in to the team's evidence
     When I scan a printed card from a saved photo
@@ -34,14 +34,14 @@ Feature: Scanning a printed card
     When I save the scanned card
     Then the card is its source's own words, as read from the photo
 
-  @built @phone @signed-in
+  @built @phone @signed-in @ocr
   Scenario: A screenshot is read as it is
     Given I am signed in to the team's evidence
     When I scan a screenshot of a card
     Then the draft says it was read as a screenshot
     And the draft has the card's tag, cite and words
 
-  @built @phone @signed-in
+  @built @phone @signed-in @ocr
   Scenario: Mark a scanned card before saving it
     Given I am signed in to the team's evidence
     When I scan a printed card from a saved photo
@@ -49,7 +49,7 @@ Feature: Scanning a printed card
     And I save the scanned card
     Then the card in git has a "highlight" span over "Soot from burning cities"
 
-  @built @phone @signed-in
+  @built @phone @signed-in @ocr
   Scenario: Scanned cards wait to be checked
     Given I am signed in to the team's evidence
     When I scan a printed card from a saved photo
@@ -58,14 +58,14 @@ Feature: Scanning a printed card
     When I discard the scans
     Then nothing waits to be checked
 
-  @missing @phone @signed-in
+  @missing @phone @signed-in @ocr
   Scenario: A page with two cards gives two cards to check
     Given I am signed in to the team's evidence
     When I scan a screenshot of a page with two cards
     Then 2 cards wait to be checked
     And the cards to check are tagged "Soot blocks sunlight" and "Fires start winter"
 
-  @built @signed-in @mvp
+  @built @signed-in @mvp @ocr
   Scenario: A photo of a page becomes a source
     Given I am signed in to the team's evidence
     When I open a source from a photo of a page
