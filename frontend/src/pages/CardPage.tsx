@@ -36,6 +36,8 @@ export default function CardPage() {
   const [removing, setRemoving] = useState(false)
 
   useEffect(() => { if (card) setPlace({ file: card.file ?? '', block: card.block ?? '' }) }, [card?.file, card?.block]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Another card (followed from a link): it opens the way a card always does, names hidden and nothing chosen.
+  useEffect(() => { setEntities(false); setActive(null); setSelection(null); setMessage(null); setRemoving(false) }, [n])
 
   // Followed from a case (#/cards/12?words=33-60): mark the words it reads.
   const words = useSearchParams()[0].get('words')
@@ -69,7 +71,16 @@ export default function CardPage() {
   const settle = useCallback(async (span: SpanRec, verdict: Verdict, id: string | null) => {
     if (span.id === undefined) return
     const spanId = span.id
-    await run(async () => { await settleName(spanId, verdict, id); return getCard(n) })
+    await run(async () => {
+      try { await settleName(spanId, verdict, id) } catch (e) {
+        // Scythe re-read the card since this name was shown (the last verdict): the same words, found again.
+        if (!(e instanceof ApiError && e.status === 404)) throw e
+        const again = (await getCard(n)).meta.spans.find((s) => s.key === 'ents' && s.start_char === span.start_char && s.end_char === span.end_char)
+        if (again?.id === undefined || again.id === spanId) throw e
+        await settleName(again.id, verdict, id)
+      }
+      return getCard(n)
+    })
   }, [n, run])
 
   /** The team's model: ask, then Enter keeps a suggestion (a commit) and x drops it for good. */

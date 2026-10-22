@@ -175,7 +175,9 @@ export async function getCard(n: number): Promise<CardDoc> {
   }
   const record = parseCardFile(file.text)
   const processed = index.processed && index.sha === file.sha
-  const ents = processed ? indexSpans(index, (s) => s.spans_key === 'ents') : []
+  // The names Scythe found hold for the same words: a verdict (or a tag) commits a new version without changing
+  // them, so they stay on screen while Scythe re-reads the card.
+  const ents = processed || index.text === record.text ? indexSpans(index, (s) => s.spans_key === 'ents') : []
   return {
     number: n, title: record.title, state: 'open', updated_at: index.updated_at, author: index.author,
     published: cleanIndexCard(index).published ?? null,
