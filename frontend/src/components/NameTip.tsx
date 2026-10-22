@@ -36,8 +36,9 @@ export default function NameTip({ span, words, state, at, canSettle, busy, onSet
         <span className="tip-kind">{kindOf(span)}</span>{' '}
         <span>{who ?? 'Scythe can’t say who this is.'}</span>
         {url && <>{' '}<a href={url} target="_blank" rel="noreferrer noopener">Wikidata</a></>}
-        {state === 'checked' && <>{' '}<span className="tip-state">checked</span></>}
-        {state === 'to-check' && <>{' '}<span className="tip-state">to check</span></>}
+        {state.here && <>{' '}<span className="tip-state">checked</span></>}
+        {!state.here && state.checked && <>{' '}<span className="tip-state">{state.toCheck ? 'the team says so; confirm it for this card' : 'checked by the team'}</span></>}
+        {!state.checked && state.toCheck && <>{' '}<span className="tip-state">to check</span></>}
       </p>
       {canSettle && !picking && (
         <div className="row">

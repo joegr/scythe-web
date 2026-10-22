@@ -52,11 +52,11 @@ export default function CardView({ card, mode = 'full', editable, showEntities, 
     const left = Math.max(0, Math.min(r.left - b.left, (body?.clientWidth ?? TIP_WIDTH) - TIP_WIDTH))
     return { top: r.bottom - b.top + 4, left }
   }
+  // Clicking a name keeps its tip open (closing is its close button or Escape), so a click never takes the tip away.
   const onName = (s: SpanRec, el: HTMLElement, how: NameEvent) => {
-    const same = tip && tip.start === s.start_char && tip.end === s.end_char
     if (how === 'enter') { holdOpen(); if (!tip?.pinned) setTip({ start: s.start_char, end: s.end_char, at: place(el), pinned: false }) }
     else if (how === 'leave') { if (!tip?.pinned) letClose() }
-    else { holdOpen(); setTip(same && tip.pinned ? null : { start: s.start_char, end: s.end_char, at: place(el), pinned: true }) }
+    else { holdOpen(); setTip({ start: s.start_char, end: s.end_char, at: place(el), pinned: true }) }
   }
   useEffect(() => {
     if (!tip?.pinned) return

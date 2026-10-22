@@ -72,7 +72,8 @@ export default function TokenText({ text, spans, condensed, editable, showEntiti
               // Pointing at a name says who it is (or its kind) in the page's own tip, so no browser tooltip doubles it.
               cls.add('t-ner')
               const state = nameState(s, names)
-              if (state) cls.add(state)
+              if (state.checked) cls.add('checked')
+              if (state.toCheck) cls.add('to-check')
               if (!onName) titles.push(whoIs(s) ?? kindOf(s))
               name ??= s
             } else if (s.id !== undefined) {
