@@ -209,3 +209,5 @@ textarea.card-tag.scan-line { font-weight: 600; }
   .scan-check .scan-card { flex: 1; }
 }
 .scan-queue li { padding: .4em 0; border-bottom: 1px solid var(--rule); }
+.scan-group + .scan-group { margin-top: 1.5rem; }
+.scan-group h2 { padding-bottom: .3em; border-bottom: 2px solid var(--ink); }

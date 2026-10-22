@@ -39,6 +39,92 @@
         "title": "ArchiveIn",
         "type": "object"
       },
+      "BriefIn": {
+        "properties": {
+          "name": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "BriefIn",
+        "type": "object"
+      },
+      "BriefOut": {
+        "description": "A brief being scanned, with its pages' progress and how many cards wait to be checked.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PageOut"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "read": {
+            "title": "Read",
+            "type": "integer"
+          },
+          "waiting": {
+            "title": "Waiting",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "pages",
+          "queued",
+          "read",
+          "failed",
+          "waiting",
+          "created_at"
+        ],
+        "title": "BriefOut",
+        "type": "object"
+      },
+      "BriefRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "BriefRef",
+        "type": "object"
+      },
       "CardIn": {
         "properties": {
           "block_id": {
@@ -96,78 +182,125 @@
         "title": "CardIn",
         "type": "object"
       },
-      "CardPatch": {
+      "CardOut": {
+        "description": "A card waiting to be checked: `tag`, `cite` and `body` as read (and fixed), `text` (all three: what becomes\nthe card's source), `markdown`, `spans` (marks over `body`, UTF-16 offsets), the brief and `pages` it was read\nfrom (two when it ran over a page break), `kind` and `corners` of its first page.",
         "properties": {
-          "block_id": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "brief": {
             "anyOf": [
               {
-                "type": "integer"
+                "$ref": "#/components/schemas/BriefRef"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Block Id"
+            ]
           },
           "cite": {
-            "anyOf": [
-              {
-                "maxLength": 2000,
-                "minLength": 0,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cite"
+            "title": "Cite",
+            "type": "string"
           },
-          "clear_block": {
-            "default": false,
-            "title": "Clear Block",
+          "continues": {
+            "title": "Continues",
             "type": "boolean"
           },
-          "sha": {
+          "corners": {
             "anyOf": [
               {
-                "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$",
-                "type": "string"
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Sha"
+            "title": "Corners"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "markdown": {
+            "title": "Markdown",
+            "type": "string"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "pages": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "spans": {
+            "items": {
+              "$ref": "#/components/schemas/SpanOut"
+            },
+            "title": "Spans",
+            "type": "array"
           },
           "tag": {
-            "anyOf": [
-              {
-                "maxLength": 1000,
-                "minLength": 0,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tag"
+            "title": "Tag",
+            "type": "string"
           },
-          "topic_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Topic Id"
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "words": {
+            "title": "Words",
+            "type": "integer"
           }
         },
-        "title": "CardPatch",
+        "required": [
+          "id",
+          "brief",
+          "page",
+          "pages",
+          "position",
+          "continues",
+          "kind",
+          "tag",
+          "cite",
+          "body",
+          "text",
+          "markdown",
+          "spans",
+          "words",
+          "corners",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CardOut",
         "type": "object"
       },
-      "DraftPatch": {
+      "CardPatch": {
         "properties": {
           "cite": {
             "anyOf": [
@@ -210,7 +343,7 @@
             "title": "Tag"
           }
         },
-        "title": "DraftPatch",
+        "title": "CardPatch",
         "type": "object"
       },
       "InviteIn": {
@@ -386,6 +519,99 @@
           }
         },
         "title": "NewSourceFile",
+        "type": "object"
+      },
+      "PageOut": {
+        "description": "A page sent to be read. `status`: queued, reading, read or failed (`error` says why, in plain words);\n`cards`: the ids of the cards read off it (the first page of each); `corners` for a photo, where it was squared\nup to, as fractions of the upright picture (TL TR BR BL, x y).",
+        "properties": {
+          "brief": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief"
+          },
+          "cards": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "corners": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corners"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "ordinal": {
+            "title": "Ordinal",
+            "type": "integer"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "words": {
+            "title": "Words",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "brief",
+          "ordinal",
+          "kind",
+          "status",
+          "error",
+          "words",
+          "corners",
+          "cards",
+          "created_at",
+          "read_at"
+        ],
+        "title": "PageOut",
         "type": "object"
       },
       "PasskeyOptionsIn": {
@@ -632,6 +858,57 @@
         "title": "SaveFile",
         "type": "object"
       },
+      "SaveIn": {
+        "description": "`topic` files the card; without it, the member's current topic.",
+        "properties": {
+          "topic": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TopicIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "SaveIn",
+        "type": "object"
+      },
+      "SavedManyOut": {
+        "properties": {
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/SavedOut"
+            },
+            "title": "Cards",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cards"
+        ],
+        "title": "SavedManyOut",
+        "type": "object"
+      },
+      "SavedOut": {
+        "properties": {
+          "card": {
+            "title": "Card",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "card"
+        ],
+        "title": "SavedOut",
+        "type": "object"
+      },
       "SettingsFile": {
         "properties": {
           "content": {
@@ -693,6 +970,44 @@
         "title": "SpanIn",
         "type": "object"
       },
+      "SpanOut": {
+        "properties": {
+          "end_char": {
+            "title": "End Char",
+            "type": "integer"
+          },
+          "key": {
+            "default": "sc",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "src": {
+            "default": "scan",
+            "title": "Src",
+            "type": "string"
+          },
+          "start_char": {
+            "title": "Start Char",
+            "type": "integer"
+          },
+          "style": {
+            "title": "Style",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "style",
+          "start_char",
+          "end_char"
+        ],
+        "title": "SpanOut",
+        "type": "object"
+      },
       "SpanPatch": {
         "properties": {
           "accepted": {
@@ -721,30 +1036,59 @@
         "title": "SpanPatch",
         "type": "object"
       },
+      "SplitIn": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at"
+        ],
+        "title": "SplitIn",
+        "type": "object"
+      },
       "TopicIn": {
+        "description": "A topic as card files record it (the app's current one).",
         "properties": {
           "event": {
             "default": "custom",
-            "maxLength": 40,
+            "maxLength": 10,
+            "minLength": 0,
             "title": "Event",
             "type": "string"
           },
+          "period": {
+            "default": "",
+            "maxLength": 60,
+            "minLength": 0,
+            "title": "Period",
+            "type": "string"
+          },
           "resolution": {
-            "maxLength": 1000,
-            "minLength": 3,
+            "default": "",
+            "maxLength": 2000,
+            "minLength": 0,
             "title": "Resolution",
             "type": "string"
           },
           "season": {
             "default": "",
-            "maxLength": 40,
+            "maxLength": 20,
             "minLength": 0,
             "title": "Season",
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 44,
+            "minLength": 1,
+            "title": "Slug",
             "type": "string"
           }
         },
         "required": [
-          "resolution"
+          "slug"
         ],
         "title": "TopicIn",
         "type": "object"
@@ -1417,7 +1761,7 @@
     },
     "/api/cards": {
       "get": {
-        "description": "`topic`, `file` and `block` filter by slug and name, as the apps know them.",
+        "description": "`topic`, `file` and `block` filter by slug and name, as the apps know them. `brief`: the cards scanned from\nthat brief, in page order.",
         "operationId": "list_cards",
         "parameters": [
           {
@@ -1576,6 +1920,23 @@
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "brief",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 300,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Brief"
             }
           }
         ],
@@ -2216,26 +2577,68 @@
         ]
       }
     },
-    "/api/scan/drafts": {
+    "/api/scan/briefs": {
       "get": {
-        "description": "Your scans waiting to be checked, newest first. Drafts left untouched for 30 days are dropped.",
-        "operationId": "list_drafts",
+        "description": "Your briefs being scanned or checked, newest first, with their pages' progress.",
+        "operationId": "list_briefs",
         "parameters": [],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BriefOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
             "description": "OK"
           }
         },
-        "summary": "List Drafts",
+        "summary": "List Briefs",
+        "tags": [
+          "scan"
+        ]
+      },
+      "post": {
+        "description": "Start scanning a brief under `name`: its pages are sent to POST /scan/pages with this brief's id.",
+        "operationId": "create_brief",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BriefIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Create Brief",
         "tags": [
           "scan"
         ]
       }
     },
-    "/api/scan/drafts/{n}": {
+    "/api/scan/briefs/{n}": {
       "delete": {
-        "description": "Discard a draft, or clear it once its card is saved.",
-        "operationId": "discard_draft",
+        "description": "Discard the brief: its pages and every card of it still waiting.",
+        "operationId": "discard_brief",
         "parameters": [
           {
             "in": "path",
@@ -2252,13 +2655,13 @@
             "description": "No Content"
           }
         },
-        "summary": "Discard Draft",
+        "summary": "Discard Brief",
         "tags": [
           "scan"
         ]
       },
       "get": {
-        "operationId": "get_draft",
+        "operationId": "get_brief",
         "parameters": [
           {
             "in": "path",
@@ -2272,17 +2675,26 @@
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefOut"
+                }
+              }
+            },
             "description": "OK"
           }
         },
-        "summary": "Get Draft",
+        "summary": "Get Brief",
         "tags": [
           "scan"
         ]
-      },
-      "patch": {
-        "description": "Fix the tag or cite, or mark the words: `spans` replaces the draft's marks (underline, highlight, emphasis over\n`body`, UTF-16 offsets on whole characters). The words themselves stay as read: the card keeps them exactly.",
-        "operationId": "edit_draft",
+      }
+    },
+    "/api/scan/briefs/{n}/save": {
+      "post": {
+        "description": "Save every card of the brief still waiting, as they are: each becomes a source and a card cut from it, with\nthe brief's name and the card's pages as its `brief`, all in one commit. Refused (409) while a page is still\nbeing read: wait for it, or drop it.",
+        "operationId": "save_brief",
         "parameters": [
           {
             "in": "path",
@@ -2298,7 +2710,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DraftPatch"
+                "$ref": "#/components/schemas/SaveIn"
               }
             }
           },
@@ -2306,20 +2718,427 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedManyOut"
+                }
+              }
+            },
             "description": "OK"
           }
         },
-        "summary": "Edit Draft",
+        "summary": "Save Brief",
         "tags": [
           "scan"
         ]
       }
     },
-    "/api/scan/photo": {
-      "post": {
-        "description": "A photo of paper at any angle, as the camera took it. This server finds the card's four corners, squares the\ncard up (undoing its tilt toward the camera), turns it upright and reads it into a draft to check, as\n/scan/screenshot, plus `corners`: where it found them, as fractions of the upright photo (TL TR BR BL, x y). Send\n`corners` (a JSON list of 8 such fractions) with `replaces` to read it again from corners the member dragged.",
-        "operationId": "scan_photo_of_paper",
+    "/api/scan/cards": {
+      "get": {
+        "description": "Your cards waiting to be checked: by brief (newest first), in page order; then pages scanned on their own,\nnewest first.",
+        "operationId": "scan_list_cards",
         "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CardOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List Cards",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
+    "/api/scan/cards/{n}": {
+      "delete": {
+        "description": "Discard a card without saving it.",
+        "operationId": "discard_card",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Discard Card",
+        "tags": [
+          "scan"
+        ]
+      },
+      "get": {
+        "operationId": "scan_get_card",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get Card",
+        "tags": [
+          "scan"
+        ]
+      },
+      "patch": {
+        "description": "Fix the tag or cite, or mark the words: `spans` replaces the card's marks (underline, highlight, emphasis over\n`body`, UTF-16 offsets on whole characters). The words themselves stay as read: the card keeps them exactly.",
+        "operationId": "edit_card",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CardPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Edit Card",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
+    "/api/scan/cards/{n}/merge": {
+      "post": {
+        "description": "Join the next card (the one after it on its page, or the first of the next page of the brief) onto this one:\nthis card's tag and cite stay, the words follow as another paragraph, with their marks.",
+        "operationId": "merge_card",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Merge Card",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
+    "/api/scan/cards/{n}/save": {
+      "post": {
+        "description": "Save the card: what was read becomes its source, and the card is cut from it word for word, with its marks,\ntag and cite, filed under `topic` (or your current one); a card from a brief carries the brief and its pages.",
+        "operationId": "scan_save_card",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Save Card",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
+    "/api/scan/cards/{n}/split": {
+      "post": {
+        "description": "Split the card at `at` (a UTF-16 offset into `body`, moved to the end of the word it lands in): the words\nbefore stay this card; the words from there become a new card after it, with the same cite and no tag.",
+        "operationId": "split_card",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SplitIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CardOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Split Card",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
+    "/api/scan/pages": {
+      "post": {
+        "description": "A page to read: a `screenshot` (read as it is) or a `photo` of paper at any angle (this server finds the\npage's four corners, squares it up, turns it upright, then reads it; send `corners`, a JSON list of 8 fractions\nof the upright picture, TL TR BR BL, to say where they are). Answers at once (202): the page is queued, and GET\n/scan/pages/{id} says when it's read and which cards it gave. `brief` and `ordinal` (its page number, 1-based;\nthe next one when left out) file it under a brief. The picture is read in memory and never kept.",
+        "operationId": "send_page",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "brief": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Brief"
+                  },
+                  "corners": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Corners"
+                  },
+                  "kind": {
+                    "default": "photo",
+                    "enum": [
+                      "screenshot",
+                      "photo"
+                    ],
+                    "title": "Kind",
+                    "type": "string"
+                  },
+                  "ordinal": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Ordinal"
+                  },
+                  "photo": {
+                    "format": "binary",
+                    "title": "Photo",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "photo"
+                ],
+                "title": "MultiPartBodyParams",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "Accepted"
+          }
+        },
+        "summary": "Send Page",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
+    "/api/scan/pages/{n}": {
+      "delete": {
+        "description": "Drop the page and the cards read off it (a card that ran over from the page before keeps its own part).",
+        "operationId": "discard_page",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "summary": "Discard Page",
+        "tags": [
+          "scan"
+        ]
+      },
+      "get": {
+        "description": "The page's state: ask again every couple of seconds while it's `queued` or `reading`.",
+        "operationId": "get_page",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Get Page",
+        "tags": [
+          "scan"
+        ]
+      }
+    },
+    "/api/scan/pages/{n}/again": {
+      "post": {
+        "description": "Read the page again, from the picture as the other kind or from corners the member dragged: its cards are\nreplaced when it's read (a card joined from the page before keeps its other part).",
+        "operationId": "read_again",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "multipart/form-data": {
@@ -2336,21 +3155,19 @@
                     ],
                     "title": "Corners"
                   },
+                  "kind": {
+                    "default": "photo",
+                    "enum": [
+                      "screenshot",
+                      "photo"
+                    ],
+                    "title": "Kind",
+                    "type": "string"
+                  },
                   "photo": {
                     "format": "binary",
                     "title": "Photo",
                     "type": "string"
-                  },
-                  "replaces": {
-                    "anyOf": [
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "title": "Replaces"
                   }
                 },
                 "required": [
@@ -2364,32 +3181,18 @@
           "required": true
         },
         "responses": {
-          "200": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PageOut"
                 }
               }
             },
-            "description": "OK"
-          },
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Created"
+            "description": "Accepted"
           }
         },
-        "summary": "Scan Photo Of Paper",
+        "summary": "Read Again",
         "tags": [
           "scan"
         ]
@@ -2397,7 +3200,7 @@
     },
     "/api/scan/report": {
       "post": {
-        "description": "A scan that failed on the member's phone before it reached /scan (the camera, the scanner script, the picture,\nor the upload): `step` where, `message` what the phone said, `agent` its browser. Written to this server's log\nonly, so the team's operator can see a failure that never left the phone.",
+        "description": "A scan that failed on the member's phone before it reached this server (the camera, the scanner script, the\npicture, or the upload): `step` where, `message` what the phone said, `agent` its browser. Written to this\nserver's log only, so the team's operator can see a failure that never left the phone.",
         "operationId": "report_scan",
         "parameters": [],
         "requestBody": {
@@ -2416,75 +3219,6 @@
           }
         },
         "summary": "Report Scan",
-        "tags": [
-          "scan"
-        ]
-      }
-    },
-    "/api/scan/screenshot": {
-      "post": {
-        "description": "A screenshot, read as it is (no corners, no turning, lossless), into a draft to check: `id`, `kind`, `tag`,\n`cite`, `body`, `text`, `markdown`, `spans`. A picture a camera took is read as a photo instead, and `kind` says\n`photo`. `replaces`: one of your drafts this reads again (200 instead of 201). The picture isn't kept.",
-        "operationId": "scan_screenshot",
-        "parameters": [],
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "properties": {
-                  "photo": {
-                    "format": "binary",
-                    "title": "Photo",
-                    "type": "string"
-                  },
-                  "replaces": {
-                    "anyOf": [
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "title": "Replaces"
-                  }
-                },
-                "required": [
-                  "photo"
-                ],
-                "title": "MultiPartBodyParams",
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Created"
-          }
-        },
-        "summary": "Scan Screenshot",
         "tags": [
           "scan"
         ]

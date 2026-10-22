@@ -6,7 +6,7 @@
 import nsdaTopics from '../../../api/nsda_topics.json'
 import {
   DEFAULT_LABELS, cardFile, parseCardFile, snapChars, sourceFile,
-  type CardFile, type CardMeta, type LabelDef, type LinkRec, type SourceHead, type SpanRec, type TopicRef,
+  type BriefRef, type CardFile, type CardMeta, type LabelDef, type LinkRec, type SourceHead, type SpanRec, type TopicRef,
 } from './doc'
 import { api, ApiError, Diverged, readFile, type Theirs } from './api'
 import { checkDate, checkUrl, cleanLine, cleanPassage, countWords, cpToU16, LIMITS, safeUrl, tooLongCard, tooLongSource, WORDS } from './text'
@@ -18,6 +18,8 @@ interface IndexCard {
   sha: string | null; author: string; processed: boolean; updated_at: string
   /** The card's source's date as its cite has it: 2024-03-15, 2024-03 or 2024. */
   published?: string | null
+  /** The brief a scanned card came from, and its pages in it ("" and [] otherwise). */
+  brief?: string; pages?: number[]
   spans: { id: number; label: string; spans_key: string; start_char: number; end_char: number; source: string; score: number | null; accepted: boolean }[]
 }
 
@@ -28,6 +30,8 @@ export interface CardDoc {
   /** Spans from the file, plus spaCy entities once the server has checked this exact version. */
   meta: CardMeta
   topic: string | null; file: string | null; block: string | null; approved: boolean
+  /** The brief a scanned card was read from, and the brief's pages it was on; null for every other card. */
+  brief: BriefRef | null
   /** The card's file as last read from git, and its blob sha (what the next save builds on). */
   record: CardFile | null; sha: string | null
   processed: boolean
@@ -67,6 +71,7 @@ function cleanIndexCard(raw: unknown): IndexCard {
     source_id: Number.isInteger(c.source_id) ? c.source_id! : null, sha: typeof c.sha === 'string' ? c.sha : null,
     author: str(c.author), processed: c.processed === true, updated_at: str(c.updated_at),
     published: typeof c.published === 'string' && DATE.test(c.published) ? c.published : null,
+    brief: str(c.brief), pages: Array.isArray(c.pages) ? c.pages.filter((p) => Number.isInteger(p) && p > 0) : [],
     spans: Array.isArray(c.spans) ? c.spans.filter((s) => s && Number.isInteger(s.start_char) && Number.isInteger(s.end_char)
       && s.start_char >= 0 && s.start_char < s.end_char && typeof s.label === 'string') : [],
   }
@@ -80,18 +85,22 @@ export function fromIndex(raw: IndexCard): CardDoc {
     published: c.published ?? null,
     meta: { kind: 'card', text: c.text, cite: c.cite, url: c.url, source: c.source_id, topic: refOf(c.topic), links: [],
       spans: indexSpans(c, (s) => s.accepted) },
-    topic: c.topic?.slug ?? null, file: c.file, block: c.block, approved: c.approved, record: null, sha: null, processed: c.processed,
+    topic: c.topic?.slug ?? null, file: c.file, block: c.block, approved: c.approved,
+    brief: c.brief ? { name: c.brief, pages: c.pages ?? [] } : null,
+    record: null, sha: null, processed: c.processed,
     suggestions: [],
   }
 }
 
 // ---------------------------------------------------------------- reading
 
+/** `brief`: only the cards scanned from that brief, in page order. */
 export async function listCards({ topic = null as string | null, file = null as string | null, approved = null as boolean | null,
-  archived = false, limit = 100 } = {}): Promise<CardDoc[]> {
+  brief = null as string | null, archived = false, limit = 100 } = {}): Promise<CardDoc[]> {
   const q = new URLSearchParams({ limit: String(limit), archived: String(archived) })
   if (topic) q.set('topic', topic)
   if (file) q.set('file', file)
+  if (brief) q.set('brief', brief)
   if (approved !== null) q.set('approved', String(approved))
   return (await api<IndexCard[]>('GET', `/cards?${q}`)).map(fromIndex)
 }
@@ -147,6 +156,7 @@ export async function getCard(n: number): Promise<CardDoc> {
     meta: { kind: 'card', text: record.text, cite: record.cite, url: record.url, source: record.source, topic: record.topic,
       spans: [...record.spans, ...ents], links: record.links },
     topic: record.topic?.slug ?? null, file: record.file, block: record.block, approved: record.approved,
+    brief: record.brief ?? null,
     record, sha: file.sha, processed,
     suggestions: indexSpans(index, (s) => s.source === 'model' && !s.accepted),
   }

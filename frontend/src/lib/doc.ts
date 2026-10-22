@@ -141,9 +141,13 @@ export function snapChars(text: string, start: number, end: number): [number, nu
 // ---------------------------------------------------------------- git files (as the server writes them)
 
 /** cards/<n>.md front matter: the record of a card. Every save is a commit of this file. */
+/** The brief a card was scanned from (its name) and the brief's pages it was read on: a tag, not a file. */
+export interface BriefRef { name: string; pages: number[] }
 export interface CardFile {
   id: number | null; title: string; topic: TopicRef | null; file: string | null; block: string | null; approved: boolean
   cite: string; url: string; source: number | null; links: LinkRec[]; spans: SpanRec[]; text: string
+  /** Only on a scanned card; the server writes it, and keeps the file's when a save leaves it out. */
+  brief?: BriefRef | null
 }
 export interface SourceHead {
   id: number | null; title: string; url: string | null; publisher: string; published: string | null; authors: string[]
@@ -182,7 +186,9 @@ function splitFront(content: string): [Record<string, unknown>, string] {
 }
 
 export function cardFile(card: CardFile): string {
-  const head = Object.fromEntries(CARD_FIELDS.map((k) => [k, card[k] ?? null]))
+  // `brief` keeps its place after `source` (the server writes it after `at`, which this app leaves to the server).
+  const head = Object.fromEntries(CARD_FIELDS.flatMap((k): [string, unknown][] =>
+    k === 'source' && card.brief ? [[k, card[k] ?? null], ['brief', { name: card.brief.name, pages: card.brief.pages }]] : [[k, card[k] ?? null]]))
   head.links = card.links ?? []
   head.spans = card.spans ?? []
   const meta = { kind: 'card' as const, text: card.text, cite: card.cite, url: card.url, source: card.source, topic: card.topic, spans: head.spans as SpanRec[], links: [] }

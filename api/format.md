@@ -43,6 +43,8 @@ Alan Robock of Rutgers University found that <u>soot from burning</u> cities wou
 - **`id` is the card number.** It is `null` before the server assigns one. Older files name it `issue`; both are read.
 - **`text` is verbatim.** It never changes once the card is cut. A card with a `source` is one stretch of it: `text` is the source's words from `at`.
 - **`at`** is where the card's words start in its source, in UTF-16 units. The server sets it. A client that doesn't know `at` may leave it out of a save; the server keeps the file's.
+- **`brief`** (after `at`, only on a card scanned from a brief): `{"name": "Aff case v2", "pages": [7, 8]}`, the brief the card was read from and the brief's pages it was on (1-based, in the order scanned; two pages when the card ran over a page break). A brief is its name and a page is its number: neither is a file, and the server's index lists a brief's cards from them (`GET /api/cards?brief=`, by first page). A client that doesn't know `brief` may leave it out of a save; the server keeps the file's.
+- **A card is at most 400 words**, a source 20,000, and a page scanned at once 1,000; a source gives at most ten cards. Words are runs of non-space characters.
 - **`links[].rel`** is one of: `answers`, `supports`, `contradicts`, `elaborates`, `same_claim`, `quotes`, `cites`, `derived_from` or `related`.
 
 **Spans:**

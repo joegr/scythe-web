@@ -6,13 +6,25 @@
  * checks it, marks it and saves it; what OCR read becomes the card's source, and the card is cut from it word for word.
  */
 import { api, ApiError, config } from './api'
-import type { SpanRec } from './doc'
+import type { SpanRec, TopicRef } from './doc'
 
 export interface ScanDraft { tag: string; cite: string; body: string; text: string; markdown: string; spans: SpanRec[] }
 export type ScanKind = 'screenshot' | 'photo'
-/** A scan waiting for its member: what the server read. `corners`: where it squared a photo up to, as fractions of the
- *  upright photo (TL TR BR BL, x y), for dragging. */
-export interface Draft extends ScanDraft { id: number; kind: ScanKind; corners: number[] | null; created_at: string }
+/** A page sent to be read: queued, being read, read (its cards are `cards`) or failed (`error` says why, in plain
+ *  words). `ordinal` is its page number in its brief; `corners`: where a photo was squared up to, as fractions of the
+ *  upright picture (TL TR BR BL, x y), for dragging. */
+export interface Page {
+  id: number; brief: number | null; ordinal: number; kind: ScanKind; status: 'queued' | 'reading' | 'read' | 'failed'
+  error: string; words: number; corners: number[] | null; cards: number[]; created_at: string; read_at: string | null
+}
+/** A brief being scanned: its pages' progress, and how many of its cards wait to be checked. */
+export interface Brief { id: number; name: string; pages: Page[]; queued: number; read: number; failed: number; waiting: number; created_at: string }
+/** A card waiting to be checked: what the server read off a page (and the member's fixes), the brief and pages it
+ *  came from (two when it ran over a page break), and its first page's kind and corners. */
+export interface ScanCard extends ScanDraft {
+  id: number; brief: { id: number; name: string } | null; page: number; pages: number[]; position: number; continues: boolean
+  kind: ScanKind; words: number; corners: number[] | null; created_at: string; updated_at: string
+}
 
 /** A phone or tablet: a touch screen with a coarse pointer (or the browser says it's mobile). */
 export function isMobile(): boolean {
@@ -161,22 +173,60 @@ export async function stillPhoto(video: HTMLVideoElement): Promise<Blob> {
 
 export const MAX_BYTES = 12 * 1024 * 1024 // what the server takes (scan.MAX_BYTES)
 
-/** Send a picture to be read as `kind` (the file as it is: no canvas, nothing re-encoded), into a draft. `replaces`:
- *  one of the member's drafts this reads again; `corners`: for a photo, where to square it up to (fractions). */
-export function readScan(picture: Blob, kind: ScanKind, opts: { replaces?: number; corners?: number[]; onWait?: () => void } = {}): Promise<Draft> {
-  if (picture.size > MAX_BYTES) return Promise.reject(new Error('That picture is too large (12 MB at most).'))
+function pictureForm(picture: Blob, kind: ScanKind, fields: Record<string, string | number | undefined>): FormData {
   const form = new FormData()
   form.append('photo', picture, kind === 'screenshot' ? 'screenshot.png' : 'photo.jpg')
-  if (opts.replaces !== undefined) form.append('replaces', String(opts.replaces))
-  if (opts.corners) form.append('corners', JSON.stringify(opts.corners))
-  return whileWaking(() => api<Draft>('POST', `/scan/${kind}`, form), opts.onWait)
+  form.append('kind', kind)
+  for (const [k, v] of Object.entries(fields)) if (v !== undefined) form.append(k, String(v))
+  return form
 }
 
-export const listDrafts = () => api<Draft[]>('GET', '/scan/drafts')
-export const getDraft = (id: number) => api<Draft>('GET', `/scan/drafts/${id}`)
-export const editDraft = (id: number, patch: { tag?: string; cite?: string; spans?: { style: string; start_char: number; end_char: number }[] }) =>
-  api<Draft>('PATCH', `/scan/drafts/${id}`, patch)
-export const discardDraft = (id: number) => api<null>('DELETE', `/scan/drafts/${id}`)
+/** Send a page to be read as `kind` (the file as it is: no canvas, nothing re-encoded). The server answers at once
+ *  (the page is queued); waitForPage says when it's read. `brief` and `ordinal` file it under a brief; `corners`:
+ *  for a photo, where to square it up to (fractions). */
+export function sendPage(picture: Blob, kind: ScanKind, opts: { brief?: number; ordinal?: number; corners?: number[]; onWait?: () => void } = {}): Promise<Page> {
+  if (picture.size > MAX_BYTES) return Promise.reject(new Error('That picture is too large (12 MB at most).'))
+  const form = pictureForm(picture, kind, { brief: opts.brief, ordinal: opts.ordinal, corners: opts.corners && JSON.stringify(opts.corners) })
+  return whileWaking(() => api<Page>('POST', '/scan/pages', form), opts.onWait)
+}
+/** Read the page again: as the other kind, or from corners the member dragged. Its cards are replaced once read. */
+export function readAgain(page: number, picture: Blob, kind: ScanKind, opts: { corners?: number[]; onWait?: () => void } = {}): Promise<Page> {
+  const form = pictureForm(picture, kind, { corners: opts.corners && JSON.stringify(opts.corners) })
+  return whileWaking(() => api<Page>('POST', `/scan/pages/${page}/again`, form), opts.onWait)
+}
+export const getPage = (id: number) => api<Page>('GET', `/scan/pages/${id}`)
+export const discardPage = (id: number) => api<null>('DELETE', `/scan/pages/${id}`)
+
+/** The page once it's read or failed: asked after every couple of seconds (a brief's pages queue up behind one
+ *  another), `onUpdate` told of each answer. */
+export async function waitForPage(id: number, onUpdate?: (p: Page) => void): Promise<Page> {
+  for (let pause = 1500; ; pause = Math.min(pause + 500, 4000)) {
+    const p = await getPage(id)
+    onUpdate?.(p)
+    if (p.status === 'read' || p.status === 'failed') return p
+    await new Promise((r) => setTimeout(r, pause))
+  }
+}
+
+export const createBrief = (name: string) => api<Brief>('POST', '/scan/briefs', { name })
+export const listBriefs = () => api<Brief[]>('GET', '/scan/briefs')
+export const getBrief = (id: number) => api<Brief>('GET', `/scan/briefs/${id}`)
+export const discardBrief = (id: number) => api<null>('DELETE', `/scan/briefs/${id}`)
+/** Every card of the brief still waiting, saved as it is: a source and a card each, in one go. */
+export const saveBrief = (id: number, topic: TopicRef) => api<{ cards: { source: number; card: number }[] }>('POST', `/scan/briefs/${id}/save`, { topic })
+
+/** The cards waiting to be checked: by brief, newest first, in page order; then pages scanned on their own. */
+export const listCards = () => api<ScanCard[]>('GET', '/scan/cards')
+export const getCard = (id: number) => api<ScanCard>('GET', `/scan/cards/${id}`)
+export const editCard = (id: number, patch: { tag?: string; cite?: string; spans?: { style: string; start_char: number; end_char: number }[] }) =>
+  api<ScanCard>('PATCH', `/scan/cards/${id}`, patch)
+export const discardCard = (id: number) => api<null>('DELETE', `/scan/cards/${id}`)
+/** What was read becomes the card's source, and the card is cut from it word for word, with its marks. */
+export const saveCard = (id: number, topic: TopicRef) => api<{ source: number; card: number }>('POST', `/scan/cards/${id}/save`, { topic })
+/** The words from `at` (a UTF-16 offset into the body) become a card of their own, after this one. */
+export const splitCard = (id: number, at: number) => api<[ScanCard, ScanCard]>('POST', `/scan/cards/${id}/split`, { at })
+/** The next card's words join this one, as another paragraph. */
+export const mergeCard = (id: number) => api<ScanCard>('POST', `/scan/cards/${id}/merge`)
 
 /** Tell the team's server a scan failed on this phone, and where: what the phone saw, never the picture. A report
  *  that can't be sent is dropped (it's only for the logs). */
