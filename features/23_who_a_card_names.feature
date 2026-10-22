@@ -16,52 +16,57 @@ Feature: Who a card names
       """
     And Scythe has checked the card
 
-  @missing
+  @built @signed-in
   Scenario: Point at a name to see who it is
     When I open the card
     And I show names and places
-    Then pointing at "Barack Obama" says "Barack Obama: 44th president of the United States"
+    Then pointing at "Barack Obama" says "Barack Obama: 44th President of the United States (2009–2017)"
     And the tooltip links to the name's page on Wikidata
 
-  @missing
+  @built @signed-in
   Scenario: Confirm a name
     When I open the card
     And I settle "Barack Obama" as "right"
     Then the card's file lists "Barack Obama" with the id "Q76"
     And I see "Barack Obama" marked as checked
 
-  @missing
+  @built @signed-in
   Scenario: It's someone else
     When I open the card
     And I settle "Barack Obama" as "it's someone else" and pick another person
     Then the card's file lists "Barack Obama" with the id I picked
 
-  @missing
+  @built @signed-in
   Scenario: Nobody we can name
     When I open the card
     And I settle "Barack Obama" as "nobody we can name"
     Then the card's file lists "Barack Obama" with a label and no id
 
-  @missing
+  @built @signed-in
   Scenario: Not a name
     When I open the card
-    And I settle "United Nations" as "not a name"
-    Then the card's file lists "United Nations" with no label and no id
-    And the card no longer asks me to check "United Nations"
+    And I settle "the United Nations" as "not a name"
+    Then the card's file lists "the United Nations" with no label and no id
+    And the card no longer asks me to check "the United Nations"
 
-  @missing
+  @partly @signed-in
+  # today: the verdict is counted in names.json and teaches the knowledge base, but only the settled card's file
+  # gains the name, so the second card still asks for it to be checked
   Scenario: A correction applies to every card that names them
     Given a second card that also names "Barack Obama"
     When I settle "Barack Obama" as "right" on the first card
     Then the second card shows "Barack Obama" as checked too
 
-  @missing
+  @built @signed-in
   Scenario: A team's verdicts are its own
     When I settle "Barack Obama" as "right"
     Then the verdict is in this team's names.json
     And no other team's Scythe has it
 
-  @missing
+  @partly @signed-in
+  # today: the server holds approval only with NAMES_GATE on, which stays off until the iOS app can settle names too;
+  # and with it on, "the United Nations" has no guess to call right (Q1065 is the only organization by that name, but
+  # its prior, 0.33, counts items of every kind and falls under the threshold)
   Scenario: A new card is approved only when its names are checked
     When I open the card
     And I try to approve the card

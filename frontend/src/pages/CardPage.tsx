@@ -33,8 +33,9 @@ export default function CardPage() {
   const [reader, setReader] = useState(false)
   const [place, setPlace] = useState({ file: '', block: '' })
   const [removing, setRemoving] = useState(false)
-  // The name pointed at, or tapped (pinned until closed): who it is, and the team's verdicts on it.
-  const [named, setNamed] = useState<{ id: number; el: HTMLElement; pinned: boolean } | null>(null)
+  // The name pointed at, or tapped (pinned until closed): who it is, and the team's verdicts on it. Held by where its
+  // words are, not its span's id, which changes each time Scythe reads the card again.
+  const [named, setNamed] = useState<{ at: [number, number]; el: HTMLElement; pinned: boolean } | null>(null)
   const closing = useRef<number | undefined>(undefined)
   const hold = () => window.clearTimeout(closing.current)
   const letGo = () => { hold(); closing.current = window.setTimeout(() => setNamed((p) => (p?.pinned ? p : null)), 300) }
@@ -97,9 +98,9 @@ export default function CardPage() {
 
   /** One verdict on a name: a commit of the card's `names` and the team's names.json, then the card as it is now. */
   const settle = useCallback((spanId: number, words: string, verdict: Verdict, item?: string) => {
+    setNamed(null) // now, not after the commit: by then the next name may be open
     run(async () => {
       await settleName(spanId, verdict, item ?? null)
-      setNamed(null)
       setMessage(verdict === 'not_a_name' ? `“${words}” isn't a name.`
         : verdict === 'wrong' && !item ? `“${words}” is nobody we can name.` : `“${words}” is checked, on every card that names them.`)
       return getCard(n)
@@ -145,8 +146,16 @@ export default function CardPage() {
     setActive(sorted[(i + 1) % sorted.length])
   }
 
-  const entAt = (t: EventTarget) => (t as Element).closest?.('[data-ent]') as HTMLElement | null
-  const namedSpan = named ? card.meta.spans.find((s) => s.key === 'ents' && s.id === named.id) : undefined
+  /** The name under an event: its words on screen, and where they are in the card. */
+  const entAt = (t: EventTarget) => {
+    const el = (t as Element).closest?.('[data-ent]') as HTMLElement | null
+    const s = el && card.meta.spans.find((x) => x.key === 'ents' && x.id === Number(el.dataset.ent))
+    return el && s ? { el, at: [s.start_char, s.end_char] as [number, number] } : null
+  }
+  const namedSpan = named ? card.meta.spans.find((s) => s.key === 'ents' && s.start_char === named.at[0] && s.end_char === named.at[1]) : undefined
+  // The name's words on screen; after a reload, the element now drawing them.
+  const anchor = !named || !namedSpan ? null
+    : named.el.isConnected ? named.el : document.querySelector<HTMLElement>(`.card [data-ent="${namedSpan.id}"]`)
   const toCheck = card.namesToCheck ?? 0
 
   return (
@@ -164,14 +173,14 @@ export default function CardPage() {
 
       {/* A name shows who it is under the pointer, and stays open with its verdicts once clicked or tapped. */}
       <div onMouseOver={(e) => {
-        const el = entAt(e.target)
-        if (!el) return
+        const hit = entAt(e.target)
+        if (!hit) return
         hold()
-        if (!named?.pinned) setNamed({ id: Number(el.dataset.ent), el, pinned: false })
+        if (!named?.pinned) setNamed({ ...hit, pinned: false })
       }} onMouseOut={(e) => { if (entAt(e.target) && !named?.pinned) letGo() }}
       onClick={(e) => {
-        const el = entAt(e.target)
-        if (el && window.getSelection()?.isCollapsed !== false) { hold(); setNamed({ id: Number(el.dataset.ent), el, pinned: true }) }
+        const hit = entAt(e.target)
+        if (hit && window.getSelection()?.isCollapsed !== false) { hold(); setNamed({ ...hit, pinned: true }) }
       }}>
       <CardView card={card} link={false} editable={!!editable} showEntities={entities}
         activeKey={active ? spanKey(active) : null} mark={selection} onSpanClick={pick}
@@ -182,9 +191,9 @@ export default function CardPage() {
         }}
         meta={editable && <button className="link" onClick={() => commit(ops.approve(!card.approved))}>{card.approved ? 'unapprove' : 'approve'}</button>} />
       </div>
-      {entities && named && namedSpan?.id !== undefined && named.el.isConnected && (
-        <NameCard span={namedSpan} words={card.meta.text.slice(namedSpan.start_char, namedSpan.end_char)} anchor={named.el}
-          names={card.names} canSettle={!!editable} busy={saving}
+      {entities && named && namedSpan?.id !== undefined && anchor && (
+        <NameCard span={namedSpan} words={card.meta.text.slice(namedSpan.start_char, namedSpan.end_char)} anchor={anchor}
+          names={card.names} canSettle={signedIn && card.state === 'open' && !diverged} busy={saving}
           onSettle={(verdict, item) => settle(namedSpan.id!, card.meta.text.slice(namedSpan.start_char, namedSpan.end_char), verdict, item)}
           onClose={() => setNamed(null)} onPointer={(inside) => (inside ? hold() : letGo())} />
       )}

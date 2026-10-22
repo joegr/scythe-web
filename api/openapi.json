@@ -2529,6 +2529,46 @@
         ]
       }
     },
+    "/api/names": {
+      "get": {
+        "description": "Who a name could be: the team's knowledge base first, then Wikidata's own search for the rest.",
+        "operationId": "search_names",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 8,
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Search Names",
+        "tags": [
+          "names"
+        ]
+      }
+    },
     "/api/scan": {
       "post": {
         "description": "A photo of a printed card, read by OCR on this server into a draft: `tag`, `cite`, `body`, `text` (all three:\nwhat becomes the source), `markdown`, and `spans`: the underlines, highlights and emphasis read off the paper, over\n`body`. With `quad` (a JSON list of 8 numbers: the card's corners, TL TR BR BL, in the photo the app took), the\nphoto must be the app's warp of those corners to the card's flat frame; it's then also turned upright. The photo\nis read in memory and never stored: no file, row or commit, and only the text goes back.",
@@ -4043,6 +4083,41 @@
         "summary": "Update Span",
         "tags": [
           "cards"
+        ]
+      }
+    },
+    "/api/spans/{span_id}/name": {
+      "post": {
+        "operationId": "settle_name",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "span_id",
+            "required": true,
+            "schema": {
+              "title": "Span Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NameIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Settle Name",
+        "tags": [
+          "names"
         ]
       }
     },
