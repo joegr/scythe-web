@@ -54,7 +54,7 @@ export default function CardView({ card, mode = 'full', editable, showEntities, 
         {view === 'md'
           ? <pre className="md">{markdown}</pre>
           : <TokenText text={card.meta.text} spans={card.suggestions.length ? [...card.meta.spans, ...card.suggestions] : card.meta.spans} condensed={view === 'read'} editable={editable}
-              showEntities={showEntities} activeKey={activeKey} onSelect={onSelect} onSpanClick={onSpanClick} mark={mark} />}
+              showEntities={showEntities} activeKey={activeKey} onSelect={onSelect} onSpanClick={onSpanClick} mark={mark} names={card.names} />}
       </div>
       <div className="card-meta">
         {link ? <Link to={`/cards/${card.number}`}>#{card.number}</Link> : <span>#{card.number}</span>}

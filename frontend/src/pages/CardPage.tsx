@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import CardView from '../components/CardView'
 import Divergence from '../components/Divergence'
 import History from '../components/History'
 import Links from '../components/Links'
+import NameCard from '../components/NameCard'
 import { People } from '../components/People'
 import Reader from '../components/Reader'
 import { snapChars, type SpanRec } from '../lib/doc'
 import { useCard, useLabels } from '../lib/hooks'
 import { useSignedIn } from '../lib/session'
 import {
-  acceptSuggestion, archiveCard, DivergedSave, force, getCard, ops, rebase, rejectSuggestion, save, spanKey, suggest,
-  type Divergence as D, type Op,
+  acceptSuggestion, archiveCard, DivergedSave, force, getCard, ops, rebase, rejectSuggestion, save, settleName, spanKey, suggest,
+  type Divergence as D, type Op, type Verdict,
 } from '../lib/store'
 import { topicLabel, useTopic } from '../lib/topic'
 
@@ -32,6 +33,20 @@ export default function CardPage() {
   const [reader, setReader] = useState(false)
   const [place, setPlace] = useState({ file: '', block: '' })
   const [removing, setRemoving] = useState(false)
+  // The name pointed at, or tapped (pinned until closed): who it is, and the team's verdicts on it.
+  const [named, setNamed] = useState<{ id: number; el: HTMLElement; pinned: boolean } | null>(null)
+  const closing = useRef<number | undefined>(undefined)
+  const hold = () => window.clearTimeout(closing.current)
+  const letGo = () => { hold(); closing.current = window.setTimeout(() => setNamed((p) => (p?.pinned ? p : null)), 300) }
+
+  useEffect(() => {
+    if (!named?.pinned) return
+    const away = (e: PointerEvent) => { if (!(e.target as Element).closest?.('.name-card, [data-ent]')) setNamed(null) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setNamed(null) }
+    document.addEventListener('pointerdown', away)
+    window.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('pointerdown', away); window.removeEventListener('keydown', esc) }
+  }, [named?.pinned])
 
   useEffect(() => { if (card) setPlace({ file: card.file ?? '', block: card.block ?? '' }) }, [card?.file, card?.block]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -80,6 +95,17 @@ export default function CardPage() {
     })
   }, [n, run])
 
+  /** One verdict on a name: a commit of the card's `names` and the team's names.json, then the card as it is now. */
+  const settle = useCallback((spanId: number, words: string, verdict: Verdict, item?: string) => {
+    run(async () => {
+      await settleName(spanId, verdict, item ?? null)
+      setNamed(null)
+      setMessage(verdict === 'not_a_name' ? `“${words}” isn't a name.`
+        : verdict === 'wrong' && !item ? `“${words}” is nobody we can name.` : `“${words}” is checked, on every card that names them.`)
+      return getCard(n)
+    })
+  }, [n, run])
+
   const apply = useCallback((name: string) => {
     const label = labels.find((l) => l.name === name)
     if (!selection || !label || !card) return
@@ -119,6 +145,10 @@ export default function CardPage() {
     setActive(sorted[(i + 1) % sorted.length])
   }
 
+  const entAt = (t: EventTarget) => (t as Element).closest?.('[data-ent]') as HTMLElement | null
+  const namedSpan = named ? card.meta.spans.find((s) => s.key === 'ents' && s.id === named.id) : undefined
+  const toCheck = card.namesToCheck ?? 0
+
   return (
     <div className="stack">
       {signedIn && card.state === 'open' && (
@@ -132,6 +162,17 @@ export default function CardPage() {
         </div>
       )}
 
+      {/* A name shows who it is under the pointer, and stays open with its verdicts once clicked or tapped. */}
+      <div onMouseOver={(e) => {
+        const el = entAt(e.target)
+        if (!el) return
+        hold()
+        if (!named?.pinned) setNamed({ id: Number(el.dataset.ent), el, pinned: false })
+      }} onMouseOut={(e) => { if (entAt(e.target) && !named?.pinned) letGo() }}
+      onClick={(e) => {
+        const el = entAt(e.target)
+        if (el && window.getSelection()?.isCollapsed !== false) { hold(); setNamed({ id: Number(el.dataset.ent), el, pinned: true }) }
+      }}>
       <CardView card={card} link={false} editable={!!editable} showEntities={entities}
         activeKey={active ? spanKey(active) : null} mark={selection} onSpanClick={pick}
         onSelect={(r) => { const s = r ? snapChars(card.meta.text, r[0], r[1]) : null; setSelection(s); setFromCase(false); if (s) setActive(null) }}
@@ -140,6 +181,13 @@ export default function CardPage() {
           if (patch.cite !== undefined) commit(ops.set('cite', patch.cite))
         }}
         meta={editable && <button className="link" onClick={() => commit(ops.approve(!card.approved))}>{card.approved ? 'unapprove' : 'approve'}</button>} />
+      </div>
+      {entities && named && namedSpan?.id !== undefined && named.el.isConnected && (
+        <NameCard span={namedSpan} words={card.meta.text.slice(namedSpan.start_char, namedSpan.end_char)} anchor={named.el}
+          names={card.names} canSettle={!!editable} busy={saving}
+          onSettle={(verdict, item) => settle(namedSpan.id!, card.meta.text.slice(namedSpan.start_char, namedSpan.end_char), verdict, item)}
+          onClose={() => setNamed(null)} onPointer={(inside) => (inside ? hold() : letGo())} />
+      )}
 
       <p className="no-print">
         {message ? message : active?.id !== undefined ? (
@@ -151,7 +199,8 @@ export default function CardPage() {
           : signedIn ? 'Select text, then press a label key. Each change is a commit.' : 'Sign in to edit.'}
       </p>
       <div className="row no-print">
-        <button className={`link ${entities ? 'on' : ''}`} aria-pressed={entities} onClick={() => setEntities(!entities)}>names and places</button>
+        <button className={`link ${entities ? 'on' : ''}`} aria-pressed={entities} onClick={() => { setEntities(!entities); setNamed(null) }}>names and places</button>
+        {toCheck > 0 && <span>{toCheck} {toCheck === 1 ? 'name' : 'names'} to check before it's approved</span>}
         {editable && <button className="link" onClick={askModel}>suggest</button>}
         {card.state === 'open' && <span>{card.processed ? 'Words checked' : 'Checking words…'}</span>}
       </div>

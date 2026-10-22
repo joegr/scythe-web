@@ -92,7 +92,18 @@ kbd { font: inherit; border-bottom: 1px solid var(--ink); }
 .t-em { text-decoration-style: double; text-decoration-thickness: 1px; }
 .t-hl.t-em { text-decoration-thickness: 2px; }
 .t-custom { text-decoration-line: underline; text-decoration-thickness: 2px; text-underline-offset: .22em; }
-.t-ner { text-decoration: underline dotted var(--ink); text-underline-offset: .3em; }
+.t-ner { text-decoration: underline dotted var(--ink); text-underline-offset: .3em; cursor: pointer; }
+/* A name the team settled stays dotted; one a new card still waits on is dashed and heavier, so it reads as a question. */
+.t-ner.to-check { text-decoration-style: dashed; text-decoration-thickness: 2px; }
+/* Who a name is, under it: the reader's cut tooltip, grown to hold the four verdicts. On a touch screen, a sheet. */
+.name-card { position: absolute; left: var(--x); top: var(--y); z-index: 3; width: min(22rem, calc(100vw - 1rem));
+  background: var(--paper); border: 1px solid var(--ink); padding: .6rem .75rem; }
+.name-card p + p, .name-card .row { margin-top: .5rem; }
+.name-card .row { flex-wrap: wrap; gap: .4rem; }
+@media (hover: none), (max-width: 600px) {
+  .name-card { position: fixed; left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 60vh; overflow-y: auto;
+    border: 0; border-top: 1px solid var(--ink); padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)); }
+}
 /* A suggestion waiting for a yes: dotted, so it never reads as the team's own mark. */
 .t-suggested { text-decoration: underline dotted var(--ink); text-decoration-thickness: 2px; text-underline-offset: .22em; text-decoration-skip-ink: none; }
 .t-active { text-decoration-color: var(--accent) !important; }
