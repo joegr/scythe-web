@@ -6,8 +6,10 @@ import History from '../components/History'
 import Links from '../components/Links'
 import { People } from '../components/People'
 import Reader from '../components/Reader'
+import { ApiError } from '../lib/api'
 import { snapChars, type SpanRec } from '../lib/doc'
 import { useCard, useLabels } from '../lib/hooks'
+import { namesToCheck, settleName, type Verdict } from '../lib/names'
 import { useSignedIn } from '../lib/session'
 import {
   acceptSuggestion, archiveCard, DivergedSave, force, getCard, ops, rebase, rejectSuggestion, save, spanKey, suggest,
@@ -52,11 +54,23 @@ export default function CardPage() {
     setSaving(true); setMessage(null)
     try { setCard(await fn()); setDiverged(null) } catch (e) {
       if (e instanceof DivergedSave) setDiverged(e.d)
-      else setMessage((e as Error).message)
+      else {
+        setMessage((e as Error).message)
+        // Approval refused until the card's names are checked: show the names, and which still wait.
+        if (e instanceof ApiError && e.status === 422 && /names in this card/i.test(e.message)) setEntities(true)
+      }
     } finally { setSaving(false) }
   }, [setCard])
 
   const commit = useCallback((op: Op) => { if (card) run(() => save(card, op)) }, [card, run])
+
+  /** A verdict on a name: the server commits it (to this card's names and the team's names.json), then the card
+   *  reloads, so the name shows as checked once Scythe has re-read the card. */
+  const settle = useCallback(async (span: SpanRec, verdict: Verdict, id: string | null) => {
+    if (span.id === undefined) return
+    const spanId = span.id
+    await run(async () => { await settleName(spanId, verdict, id); return getCard(n) })
+  }, [n, run])
 
   /** The team's model: ask, then Enter keeps a suggestion (a commit) and x drops it for good. */
   const askModel = useCallback(async () => {
@@ -111,6 +125,8 @@ export default function CardPage() {
   if (error) return <p className="error">{error}</p>
   if (!card) return null
 
+  const toCheck = namesToCheck(card.meta.text, card.meta.spans, card.names)
+
   const pick = (spans: SpanRec[]) => {
     if (window.getSelection()?.isCollapsed === false) return
     const sorted = spans.filter((s) => s.key !== 'ents').sort((a, b) => (a.end_char - a.start_char) - (b.end_char - b.start_char))
@@ -139,6 +155,7 @@ export default function CardPage() {
           if (patch.title !== undefined && patch.title.trim()) commit(ops.set('title', patch.title.trim()))
           if (patch.cite !== undefined) commit(ops.set('cite', patch.cite))
         }}
+        onSettle={settle}
         meta={editable && <button className="link" onClick={() => commit(ops.approve(!card.approved))}>{card.approved ? 'unapprove' : 'approve'}</button>} />
 
       <p className="no-print">
@@ -156,6 +173,12 @@ export default function CardPage() {
         {card.state === 'open' && <span>{card.processed ? 'Words checked' : 'Checking words…'}</span>}
       </div>
       {entities && <People card={card} />}
+      {entities && card.names !== null && toCheck.length > 0 && (
+        <p className="no-print">
+          Still to check: {toCheck.join(' · ')}. Point at a name to see who Scythe thinks it is, then say whether that’s right.
+          {card.approved ? '' : ' The card is approved once every name is checked.'}
+        </p>
+      )}
 
       <Links card={card} commit={commit} canEdit={!!editable} />
 

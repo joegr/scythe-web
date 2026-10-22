@@ -6,7 +6,8 @@
 import nsdaTopics from '../../../api/nsda_topics.json'
 import {
   DEFAULT_LABELS, cardFile, parseCardFile, snapChars, sourceFile,
-  type BriefRef, type CardFile, type CardMeta, type LabelDef, type LinkRec, type SourceHead, type SpanRec, type TopicRef,
+  type BriefRef, type CardFile, type CardMeta, type LabelDef, type LinkRec, type NameItem, type NameRec, type SourceHead,
+  type SpanRec, type TopicRef,
 } from './doc'
 import { api, ApiError, Diverged, readFile, type Theirs } from './api'
 import { checkDate, checkUrl, cleanLine, cleanPassage, countWords, cpToU16, LIMITS, safeUrl, tooLongCard, tooLongSource, WORDS } from './text'
@@ -20,7 +21,11 @@ interface IndexCard {
   published?: string | null
   /** The brief a scanned card came from, and its pages in it ("" and [] otherwise). */
   brief?: string; pages?: number[]
-  spans: { id: number; label: string; spans_key: string; start_char: number; end_char: number; source: string; score: number | null; accepted: boolean }[]
+  spans: { id: number; label: string; spans_key: string; start_char: number; end_char: number; source: string; score: number | null; accepted: boolean
+    /** On a name Scythe found: who it is, or null. */
+    name?: unknown }[]
+  /** Names Scythe guessed that nobody has settled; null on a card cut before names were checked. */
+  names_to_check?: number | null
 }
 
 export interface CardDoc {
@@ -37,6 +42,10 @@ export interface CardDoc {
   processed: boolean
   /** Marks the team's model suggests, waiting for a yes: in the index only, never in git until accepted. */
   suggestions: SpanRec[]
+  /** The names the team settled (the file's `names`), or null on a card cut before names were checked. */
+  names: NameRec[] | null
+  /** How many of Scythe's guesses at people, places and organizations still wait on the team; null as for `names`. */
+  namesToCheck: number | null
 }
 
 export interface SourceDoc { number: number; title: string; head: SourceHead; text: string }
@@ -49,8 +58,23 @@ function indexSpans(c: IndexCard, keep: (s: IndexCard['spans'][number]) => boole
   return c.spans.filter(keep).map((s) => ({
     label: s.label, key: s.spans_key, style: s.spans_key === 'ents' ? 'entity' : styleOf(s.label), src: s.source,
     start_char: cpToU16(c.text, s.start_char), end_char: cpToU16(c.text, s.end_char), id: s.id, score: s.score ?? undefined,
+    ...(s.spans_key === 'ents' ? { name: cleanName(s.name) } : {}),
   }))
 }
+
+/** Who a name is, as the index sent it, checked at the edge like the card. */
+function cleanName(raw: unknown): NameItem | null {
+  const n = (raw && typeof raw === 'object' ? raw : null) as Partial<NameItem> | null
+  if (!n || typeof n.id !== 'string' || typeof n.name !== 'string') return null
+  return { id: n.id, name: n.name, description: str(n.description), kind: str(n.kind, 'other'), url: safeUrl(n.url) ?? null, settled: n.settled === true }
+}
+
+/** The file's settled names, as written, or null for a card cut before names were checked. */
+function fileNames(record: CardFile): NameRec[] | null {
+  if (!Array.isArray(record.names)) return null
+  return record.names.filter((nm) => nm && Number.isInteger(nm.start_char) && Number.isInteger(nm.end_char) && nm.start_char < nm.end_char)
+}
+const toCheck = (c: IndexCard) => (Number.isInteger(c.names_to_check) ? c.names_to_check! : null)
 
 const STYLES = new Set(['underline', 'highlight', 'emphasis'])
 const styleOf = (label: string) => (STYLES.has(label) ? label : 'custom')
@@ -72,6 +96,7 @@ function cleanIndexCard(raw: unknown): IndexCard {
     author: str(c.author), processed: c.processed === true, updated_at: str(c.updated_at),
     published: typeof c.published === 'string' && DATE.test(c.published) ? c.published : null,
     brief: str(c.brief), pages: Array.isArray(c.pages) ? c.pages.filter((p) => Number.isInteger(p) && p > 0) : [],
+    names_to_check: Number.isInteger(c.names_to_check) ? c.names_to_check : null,
     spans: Array.isArray(c.spans) ? c.spans.filter((s) => s && Number.isInteger(s.start_char) && Number.isInteger(s.end_char)
       && s.start_char >= 0 && s.start_char < s.end_char && typeof s.label === 'string') : [],
   }
@@ -89,6 +114,7 @@ export function fromIndex(raw: IndexCard): CardDoc {
     brief: c.brief ? { name: c.brief, pages: c.pages ?? [] } : null,
     record: null, sha: null, processed: c.processed,
     suggestions: [],
+    names: null, namesToCheck: toCheck(c),
   }
 }
 
@@ -159,6 +185,7 @@ export async function getCard(n: number): Promise<CardDoc> {
     brief: record.brief ?? null,
     record, sha: file.sha, processed,
     suggestions: indexSpans(index, (s) => s.source === 'model' && !s.accepted),
+    names: fileNames(record), namesToCheck: toCheck(index),
   }
 }
 

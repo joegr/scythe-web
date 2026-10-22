@@ -93,6 +93,17 @@ kbd { font: inherit; border-bottom: 1px solid var(--ink); }
 .t-hl.t-em { text-decoration-thickness: 2px; }
 .t-custom { text-decoration-line: underline; text-decoration-thickness: 2px; text-underline-offset: .22em; }
 .t-ner { text-decoration: underline dotted var(--ink); text-underline-offset: .3em; }
+/* A name the team has checked holds a steady thin line; one a new card still waits on is dotted in the accent. */
+.t-ner.checked { text-decoration-style: solid; text-decoration-thickness: 1px; }
+.t-ner.to-check { text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
+/* Who a name is: a tip under the name, on hover and kept open once the name is clicked. */
+.card-body { position: relative; }
+.name-tip { position: absolute; z-index: 2; max-width: 24rem; width: max-content; background: var(--paper); border: 1px solid var(--ink);
+  padding: .4rem .7rem .5rem; line-height: 1.4; }
+.name-tip > * + * { margin-top: .4rem; }
+.name-tip .tip-kind { font-style: italic; }
+.name-tip .tip-state { font-weight: 600; }
+.name-tip .ac { min-width: 18rem; }
 /* A suggestion waiting for a yes: dotted, so it never reads as the team's own mark. */
 .t-suggested { text-decoration: underline dotted var(--ink); text-decoration-thickness: 2px; text-underline-offset: .22em; text-decoration-skip-ink: none; }
 .t-active { text-decoration-color: var(--accent) !important; }
