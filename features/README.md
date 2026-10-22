@@ -78,10 +78,11 @@ The table is rebuilt on `main` after every merge (`.github/workflows/features-ta
 | `16_card_history_and_removing.feature` | 1 | 2 | 2 |
 | `17_two_debaters_one_card.feature` | 4 | 2 | 0 |
 | `18_searching_printing_and_copying.feature` | 11 | 0 | 0 |
-| `19_scanning_a_card.feature` | 7 | 0 | 0 |
+| `19_scanning_a_card.feature` | 8 | 0 | 0 |
 | `20_writing_a_case.feature` | 12 | 0 | 0 |
 | `21_joining_a_team.feature` | 5 | 0 | 0 |
-| **All 21** | **116** | **23** | **10** |
+| `22_scanning_a_brief.feature` | 4 | 0 | 0 |
+| **All 22** | **121** | **23** | **10** |
 
 ## Running them
 
