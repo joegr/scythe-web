@@ -1,12 +1,11 @@
 /**
- * The front door: alpha for everyone, and a code for a school's team. Every team runs its own Scythe at
+ * The front door: a code for a school's team, and nothing else (every team is a school's own). Every team runs its own Scythe at
  * https://scythe-team-<team>.fly.dev; a code names its team (lsn-7hqkz-2pzmw-…), so the app builds that team's
  * address from the code and asks its server whether the code works (/api/door/check). Nothing here lists the
  * teams: a school's Scythe is found only by someone holding one of its codes.
  */
 import { config } from './api'
 
-export const ALPHA = 'alpha'
 export const NO_TEAM = 'That code doesn’t open a team. Check it with your coach.'
 
 export const teamAddress = (team: string) => `https://scythe-team-${team}.fly.dev`
