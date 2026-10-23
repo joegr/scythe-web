@@ -9,7 +9,15 @@ export interface SpanRec {
   start?: number; end?: number; score?: number
   /** A model suggestion's span in the index (it isn't in the card file until someone accepts it). */
   id?: number
+  /** For a name Scythe found (key `ents`): who the team's knowledge base says it is, or null when it can't say. */
+  name?: NameItem | null
 }
+/** Who a name is, as the server says it: a Wikidata item (Q76, with its page) or one of the team's own authors and
+ *  publications (scythe:author:…, no page). `settled`: the team has already said this name is them, on some card. */
+export interface NameItem { id: string; name: string; description: string; kind: string; url: string | null; settled?: boolean }
+/** A name the team settled, in a card file's `names`: who it is (`id`), nobody we can name (`id` null) or not a name
+ *  (`label` null). Offsets count UTF-16 units, like spans. */
+export interface NameRec { start_char: number; end_char: number; label: string | null; id: string | null }
 export interface LinkRec { rel: string; to: number }
 export interface TopicRef { slug: string; event: string; season: string; period: string; resolution: string }
 /** A card as the app shows it: the file's record, plus spaCy's entities once the server has checked it. */
@@ -148,6 +156,9 @@ export interface CardFile {
   cite: string; url: string; source: number | null; links: LinkRec[]; spans: SpanRec[]; text: string
   /** Only on a scanned card; the server writes it, and keeps the file's when a save leaves it out. */
   brief?: BriefRef | null
+  /** The names the team settled, on a card cut since names were checked (absent on an older card). Only the server
+   *  writes them (a verdict is its own commit); this app leaves them out of a save and the server keeps the file's. */
+  names?: NameRec[] | null
 }
 export interface SourceHead {
   id: number | null; title: string; url: string | null; publisher: string; published: string | null; authors: string[]
