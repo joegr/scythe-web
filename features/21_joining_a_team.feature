@@ -1,7 +1,7 @@
 Feature: Joining a team
-  Every team runs its own Scythe, at https://scythe-team-<team>.fly.dev. Signed out, each one opens on the same
-  front door: an "alpha" button, for the team anyone can join with an invite, and below it an optional code with
-  a "join team" button. A code names its team (lsn-7hqkz-2pzmw-…: every code starts with its team), so
+  Every team runs its own Scythe, at https://scythe-team-<team>.fly.dev, and every team is a school's own: there is
+  no open one. Signed out, each one opens on the same front door: a code with a "join team" button, and nothing
+  else (members who already have an account sign in below it). A code names its team (lsn-7hqkz-2pzmw-…: every code starts with its team), so
   the app builds that team's address from the code and asks its server, at /api/door/check, whether the code
   works; it never uses the code up. Nothing lists the teams: a school's Scythe is found only by someone holding
   one of its codes. A code for this team fills in the sign-up here; one for another team goes there, in ?invite=.
@@ -14,9 +14,9 @@ Feature: Joining a team
     Given I am not signed in
 
   @built
-  Scenario: The door offers alpha and a code
+  Scenario: The door asks for a code and nothing else
     When I open Scythe
-    Then the door offers alpha and a code
+    Then the door asks for a code and nothing else
 
   @built @mvp
   Scenario: A school's code opens its sign-up

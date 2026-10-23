@@ -7,7 +7,7 @@ import { LabelsContext, useLabelsLoader } from './lib/hooks'
 import { SessionContext, useSession } from './lib/session'
 import { isMobile } from './lib/scan'
 import { TopicProvider } from './lib/topic'
-import { ALPHA, arrivedCode, checkCode, teamAddress, thisTeam } from './lib/door'
+import { arrivedCode, checkCode, thisTeam } from './lib/door'
 import { mountUndertaker } from './lib/undertaker'
 import AccountPage from './pages/AccountPage'
 import CardPage from './pages/CardPage'
@@ -73,14 +73,13 @@ function SignedOut({ error }: { error: string | null }) {
   )
 }
 
-/** The front door, on every team's Scythe: alpha for everyone, and below it an optional code for a school's team.
- *  A code names its team (lib/door.ts): on this team's Scythe it goes into the sign-up; on another's, there. */
+/** The front door, on every team's Scythe: a school's code, and nothing else. A code names its team (lib/door.ts):
+ *  on this team's Scythe it goes into the sign-up; on another's, there. */
 function Door({ team, onCode }: { team: string | null; onCode: (code: string) => void }) {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const toSignIn = () => document.querySelector<HTMLElement>('.sign-in input, .sign-in button')?.focus()
-  const alpha = () => (team === ALPHA || !team ? toSignIn() : location.assign(teamAddress(ALPHA)))
   const join = async () => {
     setBusy(true); setError(null)
     const r = await checkCode(code, team ?? '')
@@ -93,11 +92,7 @@ function Door({ team, onCode }: { team: string | null; onCode: (code: string) =>
     <section className="gap door" style={{ marginBottom: '3rem' }}>
       {team && <p>This is <strong>{team}</strong>’s Scythe.</p>}
       <div className="row">
-        <button className={`link ${team === ALPHA ? 'on' : ''}`} onClick={alpha}>alpha</button>
-        <span>open to anyone with an invite</span>
-      </div>
-      <div className="row">
-        <input className="field" style={{ flex: 1, minWidth: '12rem' }} placeholder="Your team’s code (optional)" maxLength={120}
+        <input className="field" style={{ flex: 1, minWidth: '12rem' }} placeholder="Your team’s code" maxLength={120}
           autoComplete="off" spellCheck={false} value={code} onChange={(e) => setCode(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && code.trim() && join()} />
         <button className="link" disabled={busy || !code.trim()} onClick={join}>{busy ? 'checking…' : 'join team'}</button>
