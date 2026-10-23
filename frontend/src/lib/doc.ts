@@ -9,12 +9,13 @@ export interface SpanRec {
   start?: number; end?: number; score?: number
   /** A model suggestion's span in the index (it isn't in the card file until someone accepts it). */
   id?: number
-  /** For a name Scythe found (key `ents`): who the team's knowledge base says it is, or null. */
+  /** For a name Scythe found (key `ents`): who the team's knowledge base says it is, or null when it can't say. */
   name?: NameItem | null
 }
-/** Who a name is: a Wikidata item (Q76) or one of the team's own (scythe:author:…), as /api/names serves it. */
-export interface NameItem { id: string; name: string; description: string; kind: string; url: string | null }
-/** A name the team settled, in a card file's `names`: who (`id`), nobody we can name (`id` null), or not a name
+/** Who a name is, as the server says it: a Wikidata item (Q76, with its page) or one of the team's own authors and
+ *  publications (scythe:author:…, no page). `settled`: the team has already said this name is them, on some card. */
+export interface NameItem { id: string; name: string; description: string; kind: string; url: string | null; settled?: boolean }
+/** A name the team settled, in a card file's `names`: who it is (`id`), nobody we can name (`id` null) or not a name
  *  (`label` null). Offsets count UTF-16 units, like spans. */
 export interface NameRec { start_char: number; end_char: number; label: string | null; id: string | null }
 export interface LinkRec { rel: string; to: number }
@@ -155,8 +156,8 @@ export interface CardFile {
   cite: string; url: string; source: number | null; links: LinkRec[]; spans: SpanRec[]; text: string
   /** Only on a scanned card; the server writes it, and keeps the file's when a save leaves it out. */
   brief?: BriefRef | null
-  /** The names the team settled, on a card cut since names were checked (absent on older cards). Only the server
-   *  writes them; a save carries them through unchanged. */
+  /** The names the team settled, on a card cut since names were checked (absent on an older card). Only the server
+   *  writes them (a verdict is its own commit); this app leaves them out of a save and the server keeps the file's. */
   names?: NameRec[] | null
 }
 export interface SourceHead {
@@ -201,13 +202,6 @@ export function cardFile(card: CardFile): string {
     k === 'source' && card.brief ? [[k, card[k] ?? null], ['brief', { name: card.brief.name, pages: card.brief.pages }]] : [[k, card[k] ?? null]]))
   head.links = card.links ?? []
   head.spans = card.spans ?? []
-  // `names` comes after `spans`, and only on a card that has it (format.md).
-  if (Array.isArray(card.names)) {
-    const text = head.text
-    delete head.text
-    head.names = card.names.map((nm) => ({ start_char: nm.start_char, end_char: nm.end_char, label: nm.label, id: nm.id }))
-    head.text = text
-  }
   const meta = { kind: 'card' as const, text: card.text, cite: card.cite, url: card.url, source: card.source, topic: card.topic, spans: head.spans as SpanRec[], links: [] }
   return `---\n${diffableJson(head)}\n---\n\n${cardMarkdown(card.title, meta)}`
 }

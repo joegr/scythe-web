@@ -82,8 +82,8 @@ The table is rebuilt on `main` after every merge (`.github/workflows/features-ta
 | `20_writing_a_case.feature` | 12 | 0 | 0 |
 | `21_joining_a_team.feature` | 5 | 0 | 0 |
 | `22_scanning_a_brief.feature` | 4 | 0 | 0 |
-| `23_who_a_card_names.feature` | 6 | 2 | 0 |
-| **All 23** | **127** | **25** | **10** |
+| `23_who_a_card_names.feature` | 8 | 0 | 0 |
+| **All 23** | **129** | **23** | **10** |
 
 ## Running them
 

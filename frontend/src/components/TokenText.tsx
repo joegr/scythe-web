@@ -1,9 +1,12 @@
 import { useLayoutEffect, useMemo, useRef, type MouseEvent } from 'react'
 import type { NameRec, SpanRec } from '../lib/doc'
 import { snapChars } from '../lib/doc'
-import { nameState, nameTitle } from '../lib/names'
+import { kindOf, nameState, whoIs } from '../lib/names'
 import { paragraphs, segments, selectionRange, showSelection } from '../lib/render'
 import { spanKey } from '../lib/store'
+
+/** Pointing at a name, leaving it, or choosing it: the page shows who it is and takes a verdict. */
+export type NameEvent = 'enter' | 'leave' | 'click'
 
 interface Props {
   text: string
@@ -14,9 +17,11 @@ interface Props {
   activeKey?: string | null
   onSelect?: (range: [number, number] | null) => void
   onSpanClick?: (spans: SpanRec[], e: MouseEvent) => void
-  mark?: [number, number] | null
-  /** The card file's settled names: with them, each name shows whether it's checked. */
+  /** The names the team settled on this card (null on a card cut before names were checked): draws each name as
+   *  checked or still to check. */
   names?: NameRec[] | null
+  onName?: (span: SpanRec, el: HTMLElement, how: NameEvent) => void
+  mark?: [number, number] | null
 }
 
 const STYLE_CLASS: Record<string, string> = { underline: 't-u', highlight: 't-hl', emphasis: 't-em' }
@@ -30,7 +35,7 @@ function snapShown(el: HTMLElement, text: string): [number, number] | null {
 }
 
 /** Card text with formatting drawn as underlines only (thin / heavy / double). */
-export default function TokenText({ text, spans, condensed, editable, showEntities, activeKey, onSelect, onSpanClick, mark, names }: Props) {
+export default function TokenText({ text, spans, condensed, editable, showEntities, activeKey, onSelect, onSpanClick, names, onName, mark }: Props) {
   const visible = useMemo(() => spans.filter((s) => s.key !== 'ents' || showEntities), [spans, showEntities])
   const all = useMemo(() => (mark ? [...visible, { key: '_mark', label: '', style: '', src: '', start_char: mark[0], end_char: mark[1] }] : visible), [visible, mark])
 
@@ -61,12 +66,16 @@ export default function TokenText({ text, spans, condensed, editable, showEntiti
           const cls = new Set<string>()
           const titles: string[] = []
           let suggested: string | undefined
-          let ent: number | undefined
+          let name: SpanRec | undefined
           for (const s of real) {
             if (s.key === 'ents') {
-              cls.add('t-ner'); titles.push(nameTitle(s)); ent ??= s.id
+              // Pointing at a name says who it is (or its kind) in the page's own tip, so no browser tooltip doubles it.
+              cls.add('t-ner')
               const state = nameState(s, names)
-              if (state) cls.add(state)
+              if (state.checked) cls.add('checked')
+              if (state.toCheck) cls.add('to-check')
+              if (!onName) titles.push(whoIs(s) ?? kindOf(s))
+              name ??= s
             } else if (s.id !== undefined) {
               cls.add('t-suggested'); suggested ??= s.label; titles.push(`suggested ${s.label}`)
             } else {
@@ -76,10 +85,14 @@ export default function TokenText({ text, spans, condensed, editable, showEntiti
           }
           if (activeKey && real.some((s) => spanKey(s) === activeKey)) cls.add('t-active')
           if (seg.spans.some((s) => s.key === '_mark')) cls.add('t-mark')
+          const marks = real.some((s) => s.key !== 'ents') && onSpanClick ? real : null
+          const named = name && onName ? name : null
           children.push(
-            <span key={seg.start} data-start={seg.start} data-ent={ent} data-span={real.length && onSpanClick ? '' : undefined} data-label={suggested}
+            <span key={seg.start} data-start={seg.start} data-span={marks || named ? '' : undefined} data-label={suggested}
               className={[...cls].join(' ') || undefined} title={titles.join(' · ') || undefined}
-              onClick={real.length && onSpanClick ? (e) => onSpanClick(real, e) : undefined}>
+              onClick={marks || named ? (e) => { if (named) onName!(named, e.currentTarget, 'click'); if (marks) onSpanClick!(marks, e) } : undefined}
+              onMouseEnter={named ? (e) => onName!(named, e.currentTarget, 'enter') : undefined}
+              onMouseLeave={named ? (e) => onName!(named, e.currentTarget, 'leave') : undefined}>
               {seg.text}
             </span>,
           )

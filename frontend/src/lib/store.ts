@@ -22,7 +22,8 @@ interface IndexCard {
   /** The brief a scanned card came from, and its pages in it ("" and [] otherwise). */
   brief?: string; pages?: number[]
   spans: { id: number; label: string; spans_key: string; start_char: number; end_char: number; source: string; score: number | null; accepted: boolean
-    name?: NameItem | null }[]
+    /** On a name Scythe found: who it is, or null. */
+    name?: unknown }[]
   /** Names Scythe guessed that nobody has settled; null on a card cut before names were checked. */
   names_to_check?: number | null
 }
@@ -43,7 +44,7 @@ export interface CardDoc {
   suggestions: SpanRec[]
   /** The names the team settled (the file's `names`), or null on a card cut before names were checked. */
   names: NameRec[] | null
-  /** How many of Scythe's guesses at people, places and organizations are still to check; null as for `names`. */
+  /** How many of Scythe's guesses at people, places and organizations still wait on the team; null as for `names`. */
   namesToCheck: number | null
 }
 
@@ -61,12 +62,19 @@ function indexSpans(c: IndexCard, keep: (s: IndexCard['spans'][number]) => boole
   }))
 }
 
-/** A name's item as the server sent it, or null when it's missing or odd. */
+/** Who a name is, as the index sent it, checked at the edge like the card. */
 function cleanName(raw: unknown): NameItem | null {
-  const n = (raw && typeof raw === 'object' ? raw : {}) as Partial<NameItem>
-  if (typeof n.id !== 'string' || !n.id) return null
-  return { id: n.id, name: str(n.name, n.id), description: str(n.description), kind: str(n.kind, 'other'), url: safeUrl(n.url) ?? null }
+  const n = (raw && typeof raw === 'object' ? raw : null) as Partial<NameItem> | null
+  if (!n || typeof n.id !== 'string' || typeof n.name !== 'string') return null
+  return { id: n.id, name: n.name, description: str(n.description), kind: str(n.kind, 'other'), url: safeUrl(n.url) ?? null, settled: n.settled === true }
 }
+
+/** The file's settled names, as written, or null for a card cut before names were checked. */
+function fileNames(record: CardFile): NameRec[] | null {
+  if (!Array.isArray(record.names)) return null
+  return record.names.filter((nm) => nm && Number.isInteger(nm.start_char) && Number.isInteger(nm.end_char) && nm.start_char < nm.end_char)
+}
+const toCheck = (c: IndexCard) => (Number.isInteger(c.names_to_check) ? c.names_to_check! : null)
 
 const STYLES = new Set(['underline', 'highlight', 'emphasis'])
 const styleOf = (label: string) => (STYLES.has(label) ? label : 'custom')
@@ -88,7 +96,7 @@ function cleanIndexCard(raw: unknown): IndexCard {
     author: str(c.author), processed: c.processed === true, updated_at: str(c.updated_at),
     published: typeof c.published === 'string' && DATE.test(c.published) ? c.published : null,
     brief: str(c.brief), pages: Array.isArray(c.pages) ? c.pages.filter((p) => Number.isInteger(p) && p > 0) : [],
-    names_to_check: Number.isInteger(c.names_to_check) && c.names_to_check! >= 0 ? c.names_to_check : null,
+    names_to_check: Number.isInteger(c.names_to_check) ? c.names_to_check : null,
     spans: Array.isArray(c.spans) ? c.spans.filter((s) => s && Number.isInteger(s.start_char) && Number.isInteger(s.end_char)
       && s.start_char >= 0 && s.start_char < s.end_char && typeof s.label === 'string') : [],
   }
@@ -105,7 +113,8 @@ export function fromIndex(raw: IndexCard): CardDoc {
     topic: c.topic?.slug ?? null, file: c.file, block: c.block, approved: c.approved,
     brief: c.brief ? { name: c.brief, pages: c.pages ?? [] } : null,
     record: null, sha: null, processed: c.processed,
-    suggestions: [], names: null, namesToCheck: c.names_to_check ?? null,
+    suggestions: [],
+    names: null, namesToCheck: toCheck(c),
   }
 }
 
@@ -166,9 +175,9 @@ export async function getCard(n: number): Promise<CardDoc> {
   }
   const record = parseCardFile(file.text)
   const processed = index.processed && index.sha === file.sha
-  // A card's words never change, so the index's names hold for any version of it it has indexed: settling a name is a
-  // new version, and its names show at once rather than waiting for spaCy to read the card again.
-  const ents = index.sha === file.sha ? indexSpans(index, (s) => s.spans_key === 'ents') : []
+  // The names Scythe found hold for the same words: a verdict (or a tag) commits a new version without changing
+  // them, so they stay on screen while Scythe re-reads the card.
+  const ents = processed || index.text === record.text ? indexSpans(index, (s) => s.spans_key === 'ents') : []
   return {
     number: n, title: record.title, state: 'open', updated_at: index.updated_at, author: index.author,
     published: cleanIndexCard(index).published ?? null,
@@ -178,23 +187,8 @@ export async function getCard(n: number): Promise<CardDoc> {
     brief: record.brief ?? null,
     record, sha: file.sha, processed,
     suggestions: indexSpans(index, (s) => s.source === 'model' && !s.accepted),
-    names: Array.isArray(record.names) ? record.names : null,
-    namesToCheck: index.sha === file.sha ? cleanIndexCard(index).names_to_check ?? null : null,
+    names: fileNames(record), namesToCheck: toCheck(index),
   }
-}
-
-// ---------------------------------------------------------------- names (who a card names)
-
-/** How the team settles a name: `right` (Scythe's guess, or `id`), `wrong` (with `id`: it's that one; without: nobody
- *  we can name) or `not_a_name`. One commit writes the card's `names` and the team's names.json. */
-export type Verdict = 'right' | 'wrong' | 'not_a_name'
-export const settleName = (spanId: number, verdict: Verdict, id: string | null = null) =>
-  api('POST', `/spans/${spanId}/name`, { verdict, id })
-
-/** Who a name could be: the team's knowledge base first, then Wikidata. */
-export async function searchNames(q: string, signal?: AbortSignal): Promise<NameItem[]> {
-  const found = await api<unknown[]>('GET', `/names?${new URLSearchParams({ q: cleanLine(q, 200), limit: '8' })}`, undefined, { signal })
-  return (Array.isArray(found) ? found : []).map(cleanName).filter((n): n is NameItem => n !== null)
 }
 
 // ---------------------------------------------------------------- suggestions (the team's model)

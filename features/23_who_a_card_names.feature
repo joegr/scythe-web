@@ -49,9 +49,7 @@ Feature: Who a card names
     Then the card's file lists "United Nations" with no label and no id
     And the card no longer asks me to check "United Nations"
 
-  @partly @signed-in
-  # today: the verdict is counted in names.json and teaches the knowledge base, but only the settled card's file
-  # gains the name, so the second card still asks for it to be checked
+  @built @signed-in
   Scenario: A correction applies to every card that names them
     Given a second card that also names "Barack Obama"
     When I settle "Barack Obama" as "right" on the first card
@@ -63,10 +61,7 @@ Feature: Who a card names
     Then the verdict is in this team's names.json
     And no other team's Scythe has it
 
-  @partly @signed-in
-  # today: the server holds approval only with NAMES_GATE on, which stays off until the iOS app can settle names too;
-  # and with it on, "the United Nations" has no guess to call right (Q1065 is the only organization by that name, but
-  # its prior, 0.33, counts items of every kind and falls under the threshold)
+  @built @signed-in
   Scenario: A new card is approved only when its names are checked
     When I open the card
     And I try to approve the card

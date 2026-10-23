@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import CardView from '../components/CardView'
 import Divergence from '../components/Divergence'
 import History from '../components/History'
 import Links from '../components/Links'
-import NameCard from '../components/NameCard'
 import { People } from '../components/People'
 import Reader from '../components/Reader'
+import { ApiError } from '../lib/api'
 import { snapChars, type SpanRec } from '../lib/doc'
 import { useCard, useLabels } from '../lib/hooks'
+import { namesToCheck, settleName, type Verdict } from '../lib/names'
 import { useSignedIn } from '../lib/session'
 import {
-  acceptSuggestion, archiveCard, DivergedSave, force, getCard, ops, rebase, rejectSuggestion, save, settleName, spanKey, suggest,
-  type Divergence as D, type Op, type Verdict,
+  acceptSuggestion, archiveCard, DivergedSave, force, getCard, ops, rebase, rejectSuggestion, save, spanKey, suggest,
+  type Divergence as D, type Op,
 } from '../lib/store'
 import { topicLabel, useTopic } from '../lib/topic'
 
@@ -33,23 +34,10 @@ export default function CardPage() {
   const [reader, setReader] = useState(false)
   const [place, setPlace] = useState({ file: '', block: '' })
   const [removing, setRemoving] = useState(false)
-  // The name pointed at, or tapped (pinned until closed): who it is, and the team's verdicts on it. Held by where its
-  // words are, not its span's id, which changes each time Scythe reads the card again.
-  const [named, setNamed] = useState<{ at: [number, number]; el: HTMLElement; pinned: boolean } | null>(null)
-  const closing = useRef<number | undefined>(undefined)
-  const hold = () => window.clearTimeout(closing.current)
-  const letGo = () => { hold(); closing.current = window.setTimeout(() => setNamed((p) => (p?.pinned ? p : null)), 300) }
-
-  useEffect(() => {
-    if (!named?.pinned) return
-    const away = (e: PointerEvent) => { if (!(e.target as Element).closest?.('.name-card, [data-ent]')) setNamed(null) }
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setNamed(null) }
-    document.addEventListener('pointerdown', away)
-    window.addEventListener('keydown', esc)
-    return () => { document.removeEventListener('pointerdown', away); window.removeEventListener('keydown', esc) }
-  }, [named?.pinned])
 
   useEffect(() => { if (card) setPlace({ file: card.file ?? '', block: card.block ?? '' }) }, [card?.file, card?.block]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Another card (followed from a link): it opens the way a card always does, names hidden and nothing chosen.
+  useEffect(() => { setEntities(false); setActive(null); setSelection(null); setMessage(null); setRemoving(false) }, [n])
 
   // Followed from a case (#/cards/12?words=33-60): mark the words it reads.
   const words = useSearchParams()[0].get('words')
@@ -68,11 +56,32 @@ export default function CardPage() {
     setSaving(true); setMessage(null)
     try { setCard(await fn()); setDiverged(null) } catch (e) {
       if (e instanceof DivergedSave) setDiverged(e.d)
-      else setMessage((e as Error).message)
+      else {
+        setMessage((e as Error).message)
+        // Approval refused until the card's names are checked: show the names, and which still wait.
+        if (e instanceof ApiError && e.status === 422 && /names in this card/i.test(e.message)) setEntities(true)
+      }
     } finally { setSaving(false) }
   }, [setCard])
 
   const commit = useCallback((op: Op) => { if (card) run(() => save(card, op)) }, [card, run])
+
+  /** A verdict on a name: the server commits it (to this card's names and the team's names.json), then the card
+   *  reloads, so the name shows as checked once Scythe has re-read the card. */
+  const settle = useCallback(async (span: SpanRec, verdict: Verdict, id: string | null) => {
+    if (span.id === undefined) return
+    const spanId = span.id
+    await run(async () => {
+      try { await settleName(spanId, verdict, id) } catch (e) {
+        // Scythe re-read the card since this name was shown (the last verdict): the same words, found again.
+        if (!(e instanceof ApiError && e.status === 404)) throw e
+        const again = (await getCard(n)).meta.spans.find((s) => s.key === 'ents' && s.start_char === span.start_char && s.end_char === span.end_char)
+        if (again?.id === undefined || again.id === spanId) throw e
+        await settleName(again.id, verdict, id)
+      }
+      return getCard(n)
+    })
+  }, [n, run])
 
   /** The team's model: ask, then Enter keeps a suggestion (a commit) and x drops it for good. */
   const askModel = useCallback(async () => {
@@ -92,17 +101,6 @@ export default function CardPage() {
         await rejectSuggestion(s.id!)
         setMessage(`Dropped. Scythe won’t suggest that ${s.label} here again.`)
       }
-      return getCard(n)
-    })
-  }, [n, run])
-
-  /** One verdict on a name: a commit of the card's `names` and the team's names.json, then the card as it is now. */
-  const settle = useCallback((spanId: number, words: string, verdict: Verdict, item?: string) => {
-    setNamed(null) // now, not after the commit: by then the next name may be open
-    run(async () => {
-      await settleName(spanId, verdict, item ?? null)
-      setMessage(verdict === 'not_a_name' ? `“${words}” isn't a name.`
-        : verdict === 'wrong' && !item ? `“${words}” is nobody we can name.` : `“${words}” is checked, on every card that names them.`)
       return getCard(n)
     })
   }, [n, run])
@@ -138,6 +136,8 @@ export default function CardPage() {
   if (error) return <p className="error">{error}</p>
   if (!card) return null
 
+  const toCheck = namesToCheck(card.meta.text, card.meta.spans, card.names)
+
   const pick = (spans: SpanRec[]) => {
     if (window.getSelection()?.isCollapsed === false) return
     const sorted = spans.filter((s) => s.key !== 'ents').sort((a, b) => (a.end_char - a.start_char) - (b.end_char - b.start_char))
@@ -145,18 +145,6 @@ export default function CardPage() {
     const i = active ? sorted.findIndex((s) => spanKey(s) === spanKey(active)) : -1
     setActive(sorted[(i + 1) % sorted.length])
   }
-
-  /** The name under an event: its words on screen, and where they are in the card. */
-  const entAt = (t: EventTarget) => {
-    const el = (t as Element).closest?.('[data-ent]') as HTMLElement | null
-    const s = el && card.meta.spans.find((x) => x.key === 'ents' && x.id === Number(el.dataset.ent))
-    return el && s ? { el, at: [s.start_char, s.end_char] as [number, number] } : null
-  }
-  const namedSpan = named ? card.meta.spans.find((s) => s.key === 'ents' && s.start_char === named.at[0] && s.end_char === named.at[1]) : undefined
-  // The name's words on screen; after a reload, the element now drawing them.
-  const anchor = !named || !namedSpan ? null
-    : named.el.isConnected ? named.el : document.querySelector<HTMLElement>(`.card [data-ent="${namedSpan.id}"]`)
-  const toCheck = card.namesToCheck ?? 0
 
   return (
     <div className="stack">
@@ -171,17 +159,6 @@ export default function CardPage() {
         </div>
       )}
 
-      {/* A name shows who it is under the pointer, and stays open with its verdicts once clicked or tapped. */}
-      <div onMouseOver={(e) => {
-        const hit = entAt(e.target)
-        if (!hit) return
-        hold()
-        if (!named?.pinned) setNamed({ ...hit, pinned: false })
-      }} onMouseOut={(e) => { if (entAt(e.target) && !named?.pinned) letGo() }}
-      onClick={(e) => {
-        const hit = entAt(e.target)
-        if (hit && window.getSelection()?.isCollapsed !== false) { hold(); setNamed({ ...hit, pinned: true }) }
-      }}>
       <CardView card={card} link={false} editable={!!editable} showEntities={entities}
         activeKey={active ? spanKey(active) : null} mark={selection} onSpanClick={pick}
         onSelect={(r) => { const s = r ? snapChars(card.meta.text, r[0], r[1]) : null; setSelection(s); setFromCase(false); if (s) setActive(null) }}
@@ -189,14 +166,8 @@ export default function CardPage() {
           if (patch.title !== undefined && patch.title.trim()) commit(ops.set('title', patch.title.trim()))
           if (patch.cite !== undefined) commit(ops.set('cite', patch.cite))
         }}
+        onSettle={settle}
         meta={editable && <button className="link" onClick={() => commit(ops.approve(!card.approved))}>{card.approved ? 'unapprove' : 'approve'}</button>} />
-      </div>
-      {entities && named && namedSpan?.id !== undefined && anchor && (
-        <NameCard span={namedSpan} words={card.meta.text.slice(namedSpan.start_char, namedSpan.end_char)} anchor={anchor}
-          names={card.names} canSettle={signedIn && card.state === 'open' && !diverged} busy={saving}
-          onSettle={(verdict, item) => settle(namedSpan.id!, card.meta.text.slice(namedSpan.start_char, namedSpan.end_char), verdict, item)}
-          onClose={() => setNamed(null)} onPointer={(inside) => (inside ? hold() : letGo())} />
-      )}
 
       <p className="no-print">
         {message ? message : active?.id !== undefined ? (
@@ -208,12 +179,17 @@ export default function CardPage() {
           : signedIn ? 'Select text, then press a label key. Each change is a commit.' : 'Sign in to edit.'}
       </p>
       <div className="row no-print">
-        <button className={`link ${entities ? 'on' : ''}`} aria-pressed={entities} onClick={() => { setEntities(!entities); setNamed(null) }}>names and places</button>
-        {toCheck > 0 && <span>{toCheck} {toCheck === 1 ? 'name' : 'names'} to check before it's approved</span>}
+        <button className={`link ${entities ? 'on' : ''}`} aria-pressed={entities} onClick={() => setEntities(!entities)}>names and places</button>
         {editable && <button className="link" onClick={askModel}>suggest</button>}
         {card.state === 'open' && <span>{card.processed ? 'Words checked' : 'Checking words…'}</span>}
       </div>
       {entities && <People card={card} />}
+      {entities && card.names !== null && toCheck.length > 0 && (
+        <p className="no-print">
+          Still to check: {toCheck.join(' · ')}. Point at a name to see who Scythe thinks it is, then say whether that’s right.
+          {card.approved ? '' : ' The card is approved once every name is checked.'}
+        </p>
+      )}
 
       <Links card={card} commit={commit} canEdit={!!editable} />
 
