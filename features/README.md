@@ -68,7 +68,7 @@ The table is rebuilt on `main` after every merge (`.github/workflows/features-ta
 | `06_scythe_reads_the_card.feature` | 4 | 1 | 0 |
 | `07_names_places_and_dates.feature` | 3 | 0 | 0 |
 | `08_suggested_highlights.feature` | 5 | 0 | 0 |
-| `09_opening_an_article_by_link.feature` | 4 | 1 | 1 |
+| `09_opening_an_article_by_link.feature` | 5 | 1 | 1 |
 | `10_pasting_an_article.feature` | 4 | 2 | 0 |
 | `11_finding_a_copied_passage.feature` | 2 | 1 | 1 |
 | `12_the_source_shelf.feature` | 4 | 1 | 1 |
@@ -83,7 +83,7 @@ The table is rebuilt on `main` after every merge (`.github/workflows/features-ta
 | `21_joining_a_team.feature` | 5 | 0 | 0 |
 | `22_scanning_a_brief.feature` | 4 | 0 | 0 |
 | `23_who_a_card_names.feature` | 8 | 0 | 0 |
-| **All 23** | **129** | **23** | **10** |
+| **All 23** | **130** | **23** | **10** |
 
 ## Running them
 
