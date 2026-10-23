@@ -16,52 +16,52 @@ Feature: Who a card names
       """
     And Scythe has checked the card
 
-  @built
+  @built @signed-in
   Scenario: Point at a name to see who it is
     When I open the card
     And I show names and places
     Then pointing at "Barack Obama" says "Barack Obama: 44th president of the United States"
     And the tooltip links to the name's page on Wikidata
 
-  @built
+  @built @signed-in
   Scenario: Confirm a name
     When I open the card
     And I settle "Barack Obama" as "right"
     Then the card's file lists "Barack Obama" with the id "Q76"
     And I see "Barack Obama" marked as checked
 
-  @built
+  @built @signed-in
   Scenario: It's someone else
     When I open the card
     And I settle "Barack Obama" as "it's someone else" and pick another person
     Then the card's file lists "Barack Obama" with the id I picked
 
-  @built
+  @built @signed-in
   Scenario: Nobody we can name
     When I open the card
     And I settle "Barack Obama" as "nobody we can name"
     Then the card's file lists "Barack Obama" with a label and no id
 
-  @built
+  @built @signed-in
   Scenario: Not a name
     When I open the card
     And I settle "United Nations" as "not a name"
     Then the card's file lists "United Nations" with no label and no id
     And the card no longer asks me to check "United Nations"
 
-  @built
+  @built @signed-in
   Scenario: A correction applies to every card that names them
     Given a second card that also names "Barack Obama"
     When I settle "Barack Obama" as "right" on the first card
     Then the second card shows "Barack Obama" as checked too
 
-  @built
+  @built @signed-in
   Scenario: A team's verdicts are its own
     When I settle "Barack Obama" as "right"
     Then the verdict is in this team's names.json
     And no other team's Scythe has it
 
-  @built
+  @built @signed-in
   Scenario: A new card is approved only when its names are checked
     When I open the card
     And I try to approve the card
