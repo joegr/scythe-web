@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { NameItem, SpanRec } from '../lib/doc'
 import { kindOf, searchNames, whoIs, type NameState, type Verdict } from '../lib/names'
 import Autocomplete from './Autocomplete'
@@ -30,7 +30,8 @@ export default function NameTip({ span, words, state, at, canSettle, busy, onSet
   const url = span.name?.url ?? null
 
   return (
-    <div className="name-tip" role="group" aria-label={`Who ${words} is`} style={{ top: at.top, left: at.left }}
+    // Its place is a pair of variables, not inline offsets, so the sheet on a phone (index.css) can put it elsewhere.
+    <div className="name-tip" role="group" aria-label={`Who ${words} is`} style={{ '--tip-top': `${at.top}px`, '--tip-left': `${at.left}px` } as CSSProperties}
       onMouseEnter={onEnter} onMouseLeave={onLeave}>
       <p>
         <span className="tip-kind">{kindOf(span)}</span>{' '}
