@@ -11,9 +11,18 @@ export const ENTITY_WORDS: Record<string, string> = {
 /** The kinds of name a new card can't be approved with until they're settled (the server's names.KINDS). */
 export const CHECKED_KINDS = new Set(['PERSON', 'ORG', 'GPE', 'LOC', 'FAC', 'NORP', 'LAW', 'EVENT'])
 
-/** What pointing at a name says: who it is ("Barack Obama: 44th president of the United States"), or its kind. */
-export const nameTitle = (s: SpanRec) =>
-  s.name ? (s.name.description ? `${s.name.name}: ${s.name.description}` : s.name.name) : ENTITY_WORDS[s.label] ?? s.label
+/** A name's kind, said plainly: "Person", "Place", "Date". */
+export const kindWords = (s: SpanRec) => ENTITY_WORDS[s.label] ?? s.label
+
+/** Who the knowledge base says a name is ("Barack Obama: 44th President of the United States"), or null. */
+export const whoIs = (s: SpanRec) =>
+  s.name ? (s.name.description ? `${s.name.name}: ${s.name.description}` : s.name.name) : null
+
+/** What pointing at a name says: its kind, then who it is when Scythe knows ("Person · Barack Obama: …"). */
+export const nameTitle = (s: SpanRec) => {
+  const who = whoIs(s)
+  return who ? `${kindWords(s)} · ${who}` : kindWords(s)
+}
 
 /** A name's place in settling: checked (the team settled it), to check (a guess a new card waits on), or neither (a card
  *  cut before names were checked, or a date or number). */

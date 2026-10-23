@@ -20,7 +20,7 @@ Feature: Who a card names
   Scenario: Point at a name to see who it is
     When I open the card
     And I show names and places
-    Then pointing at "Barack Obama" says "Barack Obama: 44th President of the United States (2009–2017)"
+    Then pointing at "Barack Obama" says "Barack Obama: 44th president of the United States"
     And the tooltip links to the name's page on Wikidata
 
   @built @signed-in
@@ -45,9 +45,9 @@ Feature: Who a card names
   @built @signed-in
   Scenario: Not a name
     When I open the card
-    And I settle "the United Nations" as "not a name"
-    Then the card's file lists "the United Nations" with no label and no id
-    And the card no longer asks me to check "the United Nations"
+    And I settle "United Nations" as "not a name"
+    Then the card's file lists "United Nations" with no label and no id
+    And the card no longer asks me to check "United Nations"
 
   @partly @signed-in
   # today: the verdict is counted in names.json and teaches the knowledge base, but only the settled card's file
