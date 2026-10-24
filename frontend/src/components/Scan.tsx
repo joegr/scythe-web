@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { cameraSupported, closeCamera, createBrief, discardCard, discardPage, editCard, isMobile, kindOf, listBriefs, listCards,
-  mergeCard, openCamera, readAgain, reportScan, saveBrief, saveCard, sendPage, splitCard, stillPhoto, waitForPage, wake,
+  mergeCard, openCamera, readAgain, reportScan, saveBrief, saveCard, sendPage, shareCard, splitCard, stillPhoto, waitForPage, wake,
   type Brief, type Page, type ScanCard, type ScanKind } from '../lib/scan'
 import { DEFAULT_LABELS, snapChars, type SpanRec } from '../lib/doc'
 import { spanKey } from '../lib/store'
@@ -58,6 +58,10 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
   // What the scanner is doing right now, in words: a step that takes a moment never looks like nothing happening.
   const [status, setStatus] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // Help improve scanning: unticked for every card, ticked only by the member, for this card (features/19).
+  const [share, setShare] = useState(false)
+  const [fixing, setFixing] = useState<string | null>(null)
+  useEffect(() => { setShare(false); setFixing(null) }, [current?.id])
   const scanner = isMobile()
 
   const stop = () => { closeCamera(stream.current); stream.current = null; setLive(false) }
@@ -253,7 +257,14 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
     try {
       await patch(c)
       const topic = await require()
+      const p = pictures.current.get(c.page)
+      let shared: string | null = null
+      if (share && p) {
+        try { await shareCard(c.id, p.blob); shared = 'Thanks: the picture and your checked words will help improve scanning.' }
+        catch (e) { shared = (e as Error).message }
+      }
       const { card } = await saveCard(c.id, topic)
+      if (shared) setStatus(shared)
       setCards(queue.current.filter((x) => x.id !== c.id))
       onSaved(card)
     } catch (e) { setError((e as Error).message) } finally { setSaving(false) }
@@ -279,6 +290,17 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
       if (rest.length) setStep('queue')
       else void camera()
     } catch (e) { fail('discard', e) }
+  }
+  /** Words OCR misread, fixed to what's printed: the card and its source are the fixed words, its marks stay. */
+  const fixWords = async () => {
+    const c = current
+    if (!c || !selection || fixing === null || !fixing.trim()) return
+    try {
+      await patch(c)
+      const d = await editCard(c.id, { fix: { start_char: selection[0], end_char: selection[1], text: fixing } })
+      setCards(queue.current.map((x) => (x.id === d.id ? d : x)))
+      setCurrent(d); setSelection(null); setFixing(null)
+    } catch (e) { fail('fix', e) }
   }
   /** The words from the selection on become a card of their own, after this one. */
   const split = async () => {
@@ -362,7 +384,7 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
             {strip}
             <p>{briefMode
               ? `Photograph the brief page after page: each page is sent as soon as it’s taken, and read while you take the next. Its cards wait under “${briefName.trim()}”, in page order, to be checked here or on any device.`
-              : 'Lay the page flat in good light, on something darker than the paper, and fit it in the frame: once it holds still the picture is taken by itself. Or choose a screenshot. Your team’s server squares a photo up to the page’s corners, reads it and cuts it into its cards; a screenshot it reads as it is. Neither is kept: only the words wait for you to check.'}</p>
+              : 'Lay the page flat in good light, on something darker than the paper, and fit it in the frame: once it holds still the picture is taken by itself. Or choose a screenshot. Your team’s server squares a photo up to the page’s corners, reads it and cuts it into its cards; a screenshot it reads as it is. Neither is kept: only the words wait for you to check, unless you choose to share a card’s picture to help improve scanning when you save it.'}</p>
           </div>
         )}
         {step === 'queue' && (
@@ -413,7 +435,7 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
                   onSelect={(r) => { const s = r ? snapChars(c.body, r[0], r[1]) : null; setSelection(s); if (s) setActive(null) }} onSpanClick={pick} />
               </div>
             </article>
-            <p className="note">These are the words as read{c.spans.length ? ', with their marks' : ''}, {c.words} of them. Select words to underline, highlight or emphasize them; tap a mark to remove it. If the page was read as one card where there were two, select the first words of the second and split it; if a card was cut in two, join them. If a word is misread, take the page again: the card keeps the words exactly.</p>
+            <p className="note">These are the words as read{c.spans.length ? ', with their marks' : ''}, {c.words} of them. Select words to underline, highlight or emphasize them; tap a mark to remove it. If the page was read as one card where there were two, select the first words of the second and split it; if a card was cut in two, join them. If a word is misread, select it and fix it to what’s printed: the card is its words as you fix them.</p>
             <div className="scan-tools stack">
             <div className="row">
               {MARKS.map((l) => (
@@ -426,8 +448,22 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
             <div className="row">
               <button className="link" disabled={!selection} onMouseDown={(e) => e.preventDefault()} onClick={() => void split()}>split here</button>
               <button className="link" onClick={() => void join()}>join with the next</button>
+              <button className="link" disabled={!selection} onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selection && setFixing(c.body.slice(selection[0], selection[1]))}>fix the words</button>
               {c.kind === 'photo' && kept && <button className="link" onClick={() => { setCorners(c.corners ?? [0, 0, 1, 0, 1, 1, 0, 1]); setStep('corners') }}>adjust the corners</button>}
             </div>
+            {fixing !== null && selection && (
+              <div className="row">
+                <input className="field" aria-label="What’s printed" maxLength={200} value={fixing} autoFocus
+                  onChange={(e) => setFixing(e.target.value.replace(/\n/g, ' '))} onKeyDown={(e) => { if (e.key === 'Enter') void fixWords() }} />
+                <button className="link" disabled={!fixing.trim()} onClick={() => void fixWords()}>fix</button>
+                <button className="link" onClick={() => setFixing(null)}>cancel</button>
+              </div>
+            )}
+            {kept
+              ? <label className="row note"><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} />
+                  Help improve scanning: send this picture and the words I checked to Scythe.</label>
+              : <p className="note">This page’s picture isn’t on this device, so it can’t be shared to help improve scanning.</p>}
             <div className="row">
               <button className="action" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save card'}</button>
               <button className="link" onClick={() => void discard()}>discard</button>

@@ -221,12 +221,22 @@ export const saveBrief = (id: number, topic: TopicRef) => api<{ cards: { source:
 /** The cards waiting to be checked: by brief, newest first, in page order; then pages scanned on their own. */
 export const listCards = () => api<ScanCard[]>('GET', '/scan/cards')
 export const getCard = (id: number) => api<ScanCard>('GET', `/scan/cards/${id}`)
-export const editCard = (id: number, patch: { tag?: string; cite?: string; spans?: { style: string; start_char: number; end_char: number }[] }) =>
+export const editCard = (id: number, patch: { tag?: string; cite?: string; spans?: { style: string; start_char: number; end_char: number }[];
+  fix?: { start_char: number; end_char: number; text: string } }) =>
   api<ScanCard>('PATCH', `/scan/cards/${id}`, patch)
 export const discardCard = (id: number) => api<null>('DELETE', `/scan/cards/${id}`)
 /** What was read becomes the card's source, and the card is cut from it word for word, with its marks. */
 export const saveCard = (id: number, topic: TopicRef) => api<{ source: number; card: number }>('POST', `/scan/cards/${id}/save`, { topic })
 /** The words from `at` (a UTF-16 offset into the body) become a card of their own, after this one. */
+/** Help improve scanning (features/19): the page's picture, sent again from this phone, and the card as checked now,
+ *  go to the gold store. Only when the member ticked the box, right before saving. */
+export function shareCard(id: number, picture: Blob): Promise<{ shared: boolean; split: string }> {
+  const form = new FormData()
+  form.append('photo', picture, 'page')
+  return api<{ shared: boolean; split: string }>('POST', `/scan/cards/${id}/share`, form)
+}
+/** Everything this member shared to improve scanning is deleted from the gold store. */
+export const forgetShared = () => api<{ forgotten: number }>('POST', '/scan/forget')
 export const splitCard = (id: number, at: number) => api<[ScanCard, ScanCard]>('POST', `/scan/cards/${id}/split`, { at })
 /** The next card's words join this one, as another paragraph. */
 export const mergeCard = (id: number) => api<ScanCard>('POST', `/scan/cards/${id}/merge`)

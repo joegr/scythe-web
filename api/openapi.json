@@ -351,6 +351,16 @@
             ],
             "title": "Cite"
           },
+          "fix": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FixIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "spans": {
             "anyOf": [
               {
@@ -463,6 +473,32 @@
           "did"
         ],
         "title": "EntryIn",
+        "type": "object"
+      },
+      "FixIn": {
+        "description": "Words OCR misread: from `start_char` to `end_char` of `body` (UTF-16, whole words), what's printed there.",
+        "properties": {
+          "end_char": {
+            "title": "End Char",
+            "type": "integer"
+          },
+          "start_char": {
+            "title": "Start Char",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 200,
+            "minLength": 0,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_char",
+          "end_char",
+          "text"
+        ],
+        "title": "FixIn",
         "type": "object"
       },
       "InviteIn": {
@@ -3217,7 +3253,7 @@
         ]
       },
       "patch": {
-        "description": "Fix the tag or cite, or mark the words: `spans` replaces the card's marks (underline, highlight, emphasis over\n`body`, UTF-16 offsets on whole characters). The words themselves stay as read: the card keeps them exactly.",
+        "description": "Fix the tag or cite, mark the words, or fix words OCR misread: `spans` replaces the card's marks (underline,\nhighlight, emphasis over `body`, UTF-16 offsets on whole characters); `fix` puts what's printed in place of\nmisread words (whole words of `body`), the marks staying over the same words. Otherwise the words stay exactly\nas read, and the card is cut from them.",
         "operationId": "edit_card",
         "parameters": [
           {
