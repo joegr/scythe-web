@@ -5,7 +5,7 @@ import { pastedPage, type ReadPage } from '../lib/bookmarklet'
 import { snapChars } from '../lib/doc'
 import { caretOffset, selectionRange } from '../lib/render'
 import { readPhoto } from '../lib/scan'
-import { cardsCutFrom, createCard, createSource, defaultCite, fetchSource, getSource, listSources, locateAll, type SourceDoc } from '../lib/store'
+import { cardsCutFrom, createCard, createSource, defaultCite, fetchSource, getSource, listSources, locateAll, removeSource, type SourceDoc } from '../lib/store'
 import { topicLabel, useTopic } from '../lib/topic'
 import PhotoPick from './PhotoPick'
 import ReadHere from './ReadHere'
@@ -290,6 +290,11 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
               {safeUrl(source.head.url) && <> · <a href={safeUrl(source.head.url)!} target="_blank" rel="noreferrer noopener">original, {siteOf(safeUrl(source.head.url)!)}</a></>}
               {' · '}<a href={`${config.apiBase()}/api/git/file?path=sources/${source.number}.md`} target="_blank" rel="noreferrer">#{source.number}</a>
               {cuts !== null && <> · {cuts} of {CARDS_PER_SOURCE} cards cut</>}
+              {cuts === 0 && <> · <button className="link" disabled={busy} onClick={() => run(async () => {
+                await removeSource(source.number)
+                setSource(null); setMode('paste'); setNote('Source removed. Its history keeps it.')
+                setRecent((r) => r.filter((x) => x.number !== source.number))
+              })}>Remove source</button></>}
             </p>
             {full && <p className="note">{SOURCE_FULL}</p>}
             <div ref={textRef} className="reader-text" onMouseUp={(e) => {

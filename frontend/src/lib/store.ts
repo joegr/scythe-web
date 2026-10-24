@@ -122,8 +122,9 @@ export function fromIndex(raw: IndexCard): CardDoc {
 
 /** `brief`: only the cards scanned from that brief, in page order. */
 export async function listCards({ topic = null as string | null, file = null as string | null, approved = null as boolean | null,
-  brief = null as string | null, archived = false, limit = 100 } = {}): Promise<CardDoc[]> {
+  brief = null as string | null, source = null as number | null, archived = false, limit = 100 } = {}): Promise<CardDoc[]> {
   const q = new URLSearchParams({ limit: String(limit), archived: String(archived) })
+  if (source !== null) q.set('source_id', String(source))
   if (topic) q.set('topic', topic)
   if (file) q.set('file', file)
   if (brief) q.set('brief', brief)
@@ -351,6 +352,11 @@ export async function getSource(n: number): Promise<SourceDoc> {
 /** How many cards (not removed) were cut from source #n: one source gives at most CARDS_PER_SOURCE. */
 export async function cardsCutFrom(n: number): Promise<number> {
   return (await api<unknown[]>('GET', `/cards?${new URLSearchParams({ source_id: String(n), limit: '50' })}`)).length
+}
+
+/** Take a source nobody cut a card from off the shelf (its history stays); the server refuses one with cards. */
+export async function removeSource(n: number): Promise<void> {
+  await api('POST', `/git/sources/${n}/remove`)
 }
 
 export async function listSources(): Promise<{ number: number; title: string }[]> {
