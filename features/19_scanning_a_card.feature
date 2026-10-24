@@ -1,9 +1,12 @@
 Feature: Scanning a printed card
   On a phone or tablet, a signed-in member can scan a printed page of cards: "Scan a card" is the first thing on the
-  cut page, and "scan" is first in the menu, after the logo. Scythe asks for the camera only when they press it;
-  without the camera, they can take a photo with the phone's own camera, or choose a saved photo or screenshot. The
-  picture goes to the team's server as it is, and the answer comes at once: the server reads pictures in its own
-  queue, a few at a time, and the phone asks after the page until it's read. A screenshot is read as it is; a photo
+  cut page, and "scan" is first in the menu, after the logo. Scythe asks for the camera only when they press it, and
+  shows it inside Scythe, never the phone's camera app: a frame to fit the page in, as an ID scanner does, and the
+  page's outline once it's found in the picture (components/Finder.tsx, on the phone: "Fit the card inside the frame",
+  "Hold still…", "Got it"); the picture is taken by itself once the page holds still, and the shutter still works.
+  Without the camera they can choose a saved photo or screenshot. The picture goes to the team's server as it is, and
+  the answer comes at once: the server reads pictures in its own queue, a few at a time, through the shared OCR
+  service, and the phone asks after the page until it's read. A screenshot is read as it is; a photo
   of paper is squared up first, on the server: it finds the page's four corners and undoes its tilt toward the
   camera, and they can drag the corners and read it again. Scythe tells a screenshot from a photo by the file (a
   camera names itself in every photo), and they can switch it. The server reads the picture with OCR (it isn't

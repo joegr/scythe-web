@@ -58,7 +58,7 @@ Feature: Choosing the resolution
     Then I can scroll through all 235 LD resolutions
 
   @partly
-  # today: custom resolutions show their slug, e.g. "custom-schools-ban-phones-k3x9z", in Library and Search
+  # today: the Library shows a custom resolution's words; Search's filter line still shows its slug, e.g. "custom-schools-ban-phones-k3x9z"
   Scenario: A custom resolution reads as the resolution everywhere
     Given a card filed under a custom resolution "Resolved: Schools should ban phones."
     When I look at the library

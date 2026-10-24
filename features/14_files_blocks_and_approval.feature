@@ -33,14 +33,13 @@ Feature: Files, blocks and approval
     Then I see the block "Solvency" with the card "Filed <run>"
 
   @partly @signed-in
-  # today: filing with no block was dropped from the library
+  # today: a file whose cards have no block doesn't appear in the library's list of files
   Scenario: A file with no block still shows in the library
     When I open the card
     And I file it under file "Loose <run>" and no block
     Then the library shows "Loose <run>" with the card under "Unfiled"
 
-  @partly
-  # today: GitHub labels cut file names to 50 characters
+  @built
   Scenario: A long file name isn't cut short
     When I file a card under "Neg – Arctic militarization DA – Russia escalation links"
     Then the library shows the whole name

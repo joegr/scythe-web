@@ -20,7 +20,7 @@ Feature: A card's history, and removing a card
     And each history entry names who made it
 
   @partly @signed-in
-  # today: each entry shows a 7-character commit id and the raw commit message
+  # today: each entry shows the raw commit message (e.g. "highlight: …"), its author and date
   Scenario: History reads as sentences
     Given the card has a "highlight" span over "block sunlight"
     When I open the card
@@ -34,8 +34,7 @@ Feature: A card's history, and removing a card
     Then the card shows no highlight
     And I can put that version back, which saves it as a new change
 
-  @partly @signed-in
-  # today: archive acts at once, with no question, and a failure does nothing visible
+  @built @signed-in
   Scenario: Removing a card asks first, and says if it failed
     When I open the card
     And I remove the card

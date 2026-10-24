@@ -1,6 +1,6 @@
 # Features
 
-Eighteen Gherkin features describe Scythe from a debater's side: cards and the words in them first, then what Scythe reads in the language, then sources, then organizing and team work. They are the spec the app is built and tested against.
+Twenty-four Gherkin features describe Scythe from a debater's side: cards and the words in them first, then what Scythe reads in the language, then sources, then organizing and team work. They are the spec the app is built and tested against.
 
 ## Two registers
 
@@ -9,22 +9,23 @@ Eighteen Gherkin features describe Scythe from a debater's side: cards and the w
   - span labels and offsets
   - `cards/<n>.md` front matter and the blob sha a save is pinned to
   - the 409 and `theirs`
-  - issue labels such as `scythe:fetch-failed`, and NSDA topic slugs
+  - NSDA topic slugs
   An engineer can test against every line.
 - **The screens speak debate.** Any text a debater sees, quoted in a `see` / `sees` step, must be plain debate language. The server's checks fail if a quoted on-screen string uses repo, commit, issue, spaCy, sha, API, server, rebase, main, markdown, token or entities.
 
-| Today on screen | Production copy |
-| --- | --- |
-| repository / repo | the team's evidence (on GitHub) |
-| commit / save | saved, with "who changed what" in the card's history |
-| issue #n | card 12, source 4 |
-| spaCy processing / up to date | checking words / words checked |
-| entities (PERSON, ORG…) | names, organizations, places, dates |
-| condensed / "read" mode | read-aloud |
-| md mode | plain text |
-| diverged | your partner saved this card first |
-| rebase / keep theirs / force | add my change to theirs / keep theirs / keep mine |
-| fine-grained token | a GitHub sign-in key |
+Technical words still on screen today, and the debate words they become:
+
+| Today on screen | Where | Production copy |
+| --- | --- | --- |
+| "committing…", "at 1a2b3c4" | the card's label bar (`CardPage.tsx`) | "saving…", and "who changed what" in the card's history |
+| "Each change is a commit." | the card's hint (`CardPage.tsx`) | "Every change is saved, with your name, in the card's history." |
+| "It's saved as a topic issue in the repo." | the topic picker (`TopicPicker.tsx`) | "It's saved for your team." |
+| "spaCy span group key", "spans key" | the labels page (`LabelsPage.tsx`) | a label's kind, chosen from a list |
+| "Your save and main have diverged", "Rebase mine onto theirs", "Force mine" | a save that lost a race (`Divergence.tsx`) | "your partner saved this card first": add my change to theirs / keep theirs / keep mine |
+| condensed / "read" mode | a card's views (`CardView.tsx`) | read-aloud |
+| md mode | a card's views | plain text |
+
+Already in debate words: "Checking words…" / "Words checked" for spaCy's processing, card and source numbers rather than issue numbers, and "the team's evidence" for the record (each team's own server; nothing is on GitHub).
 
 ## Status tags
 
@@ -50,6 +51,7 @@ Each release publishes the features with it: every `.feature` file, this README 
 
 Other tags:
 - `@signed-in`: the scenario needs a signed-in debater.
+- `@phone`: runs only in the phone project, a Pixel 7 in Chrome whose camera sees a printed card (e2e/fixtures/card.mjpeg); every other scenario runs on a desktop browser. It's the web app on a phone, not the iPhone app.
 - `@two-debaters`: two browsers on the same card.
 - `@slow`: waits on background work or a live article fetch, usually 1–5 minutes.
 - `@ocr`: reads a real picture, so it needs the shared OCR service (joegr/scythe-ocr) as well as a team server. Server checks skip it; the live run against a deployed team runs it, and the OCR service is tested on its own.

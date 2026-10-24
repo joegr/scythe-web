@@ -57,10 +57,11 @@ Feature: Opening an article by its link
     And I see "doesn't let Scythe read its pages. Open it in your browser and paste the article's text instead"
     And the paste form is open with the link already filled in
 
-  @missing @signed-in
+  @built @signed-in
   Scenario: The same link twice opens the same source
     Given the source for "https://en.wikipedia.org/wiki/Nuclear_winter" is already in the team's evidence
-    When I fetch the link "https://en.wikipedia.org/wiki/Nuclear_winter"
+    When I open the reader
+    And I fetch the link "https://en.wikipedia.org/wiki/Nuclear_winter"
     Then the reader opens that source at once
     And no new source is made
 

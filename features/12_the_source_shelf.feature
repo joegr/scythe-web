@@ -33,8 +33,7 @@ Feature: The source shelf
     Then I see a "Sources" section listing "Shelf study <run>"
     And under it the card "Shelf card <run>"
 
-  @partly
-  # today: there is no way to remove a source in the app
+  @missing
   Scenario: Remove a source nobody cut from
     Given a source with no cards
     When I remove the source
