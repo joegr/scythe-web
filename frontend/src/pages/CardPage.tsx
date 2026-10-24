@@ -174,7 +174,9 @@ export default function CardPage() {
           if (patch.cite !== undefined) commit(ops.set('cite', patch.cite))
         }}
         onSettle={settle}
-        meta={editable && <button className="link" onClick={() => commit(ops.approve(!card.approved))}>{card.approved ? 'unapprove' : 'approve'}</button>} />
+        meta={editable && <button className="link" onClick={() => commit(ops.approve(!card.approved))}
+          title={card.approved ? 'Take it back: the card isn’t ready for rounds.' : 'Approve when the card is cut and checked, ready for rounds.'}>
+          {card.approved ? 'unapprove' : 'approve'}</button>} />
 
       <p className="no-print">
         {message ? message : active?.id !== undefined ? (
