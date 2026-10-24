@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { CardFile, SpanRec } from '../lib/doc'
 import type { Divergence as D } from '../lib/store'
+import { sentence } from './History'
 
 const show = (f: CardFile, s: SpanRec) => `${s.label} “${f.text.slice(s.start_char, s.end_char).slice(0, 50)}”`
 const keyOf = (s: SpanRec) => `${s.key}|${s.label}|${s.start_char}|${s.end_char}`
@@ -20,37 +21,45 @@ function changes(base: CardFile, side: CardFile): string[] {
   return out
 }
 
-interface Props { d: D; base: CardFile; onRebase: () => void; onTheirs: () => void; onForce: () => void; busy: boolean }
+interface Props {
+  d: D; base: CardFile; onRebase: () => void; onTheirs: () => void; onForce: () => void; busy: boolean
+  /** What went wrong settling it (a dropped connection…), said here, not on the page behind. */
+  error?: string | null
+}
 
-export default function Divergence({ d, base, onRebase, onTheirs, onForce, busy }: Props) {
+/** A partner saved this card first: what they did, what I did, and the three ways to settle it, in debate words. */
+export default function Divergence({ d, base, onRebase, onTheirs, onForce, busy, error }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => { if (!ref.current?.open) ref.current?.showModal() }, [])
   const theirs = changes(base, d.theirs)
   const mine = changes(base, d.mine)
+  const who = d.commit.author ?? 'Your partner'
   const when = d.commit.date ? new Date(d.commit.date).toLocaleString() : ''
   return (
     <dialog ref={ref} className="sheet" onCancel={(e) => e.preventDefault()}>
       <div className="sheet-inner stack">
         <section className="gap">
-          <h1>Your save and main have diverged</h1>
-          <p>
-            {d.commit.author ?? 'Someone'} committed to this card after you opened it
-            {d.commit.message ? <>: <strong>{d.commit.message}</strong></> : null}{when && ` (${when})`}.
-          </p>
-        </section>
-        <section className="gap">
-          <h3>Theirs, on main</h3>
-          <pre className="md">{theirs.length ? theirs.join('\n') : '(no visible change)'}</pre>
-          <h3>Yours, not saved</h3>
-          <pre className="md">{mine.join('\n') || d.op.message}</pre>
+          <h1>{who} saved this card first</h1>
+          <ul className="list">
+            {d.commit.message && <li>{sentence(d.commit.message, who)}{when && `, ${when}`}</li>}
+            <li>{sentence(d.op.message, 'You')} (not saved yet)</li>
+          </ul>
         </section>
         <section className="gap">
           <div className="row">
-            <button className="action" disabled={busy} onClick={onRebase}>Rebase mine onto theirs</button>
-            <button className="link" disabled={busy} onClick={onTheirs}>Keep theirs, drop mine</button>
-            <button className="link" disabled={busy} onClick={onForce}>Force mine</button>
+            <button className="action" disabled={busy} onClick={onRebase}>Add my change to theirs</button>
+            <button className="link" disabled={busy} onClick={onTheirs}>Keep theirs</button>
+            <button className="link" disabled={busy} onClick={onForce}>Keep mine</button>
           </div>
-          <p>Rebase replays “{d.op.message}” on their version, the usual choice. Force replaces their version with yours; theirs stays in the history.</p>
+          <p>Adding your change to theirs keeps both, the usual choice. Keep theirs drops your change. Keep mine saves
+            your version over theirs; theirs stays in the history.</p>
+          {error && <p className="error">{error}</p>}
+        </section>
+        <section className="gap">
+          <h3>What {who} changed</h3>
+          <pre className="md">{theirs.length ? theirs.join('\n') : '(nothing you can see)'}</pre>
+          <h3>What you changed, not saved yet</h3>
+          <pre className="md">{mine.join('\n') || d.op.message}</pre>
         </section>
       </div>
     </dialog>

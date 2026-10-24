@@ -268,7 +268,7 @@ export default function CardPage() {
       )}
 
       {diverged && card.record && (
-        <Divergence d={diverged} base={card.record} busy={saving}
+        <Divergence d={diverged} base={card.record} busy={saving} error={message}
           onRebase={() => run(() => rebase(card.number, diverged))}
           onTheirs={() => { setDiverged(null); reload() }}
           onForce={() => run(() => force(card.number, diverged))} />
