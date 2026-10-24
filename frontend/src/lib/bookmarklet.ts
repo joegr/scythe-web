@@ -45,9 +45,9 @@ export function readThisPage(app: string, limit: number) {
     else if (x && typeof x === 'object') { things.push(x as Thing); walk((x as Thing)['@graph']) }
   }
   d.querySelectorAll('script[type="application/ld+json"]').forEach((s) => { try { walk(JSON.parse(s.textContent || '')) } catch { /* not ours to fix */ } })
-  const story = things.find((t) => /Article|Posting|Report/.test(String(t['@type'])) && (t.author || t.datePublished)) || {}
+  const story = things.find((t) => /Article|Posting|Report/.test(String(t['@type'])) && (t.author || t.creator || t.datePublished)) || {}
   const nameOf = (x: unknown): string => (typeof x === 'string' ? x : x && typeof x === 'object' ? String((x as Thing).name || '') : '')
-  const people = ([] as unknown[]).concat(story.author || []).map(nameOf)
+  const people = ([] as unknown[]).concat(story.author || story.creator || []).map(nameOf)
 
   // The article: the <article> holding most words, else the element whose paragraphs (and their parents') hold most.
   const size = (root: Element) => [...root.querySelectorAll('p')].filter(shown).reduce((n, p) => n + words(p).length, 0)
@@ -77,15 +77,19 @@ export function readThisPage(app: string, limit: number) {
     if (kept < limit) { out.push(w.slice(0, limit - kept).join(' ')); kept += Math.min(w.length, limit - kept) }
   }
 
+  const h1 = root.querySelector('h1') || d.querySelector('h1')
+  const publisher = meta('og:site_name', 'application-name') || nameOf(story.publisher)
   const canonical = d.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href || meta('og:url')
   const page = {
     scythe: 'page',
     text: out.join('\n\n'),
-    title: meta('og:title', 'twitter:title', 'headline') || nameOf(story.headline) || d.title,
+    // The headline, without the " | Publication" a site adds to it.
+    title: (nameOf(story.headline) || meta('og:title', 'twitter:title', 'headline') || (h1 ? words(h1) : '') || d.title)
+      .replace(/\s+[|–—-]\s+[^|–—-]{1,60}$/, (end) => (publisher && end.includes(publisher) ? '' : end)),
     url: /^https?:\/\//.test(canonical) ? canonical : location.href,
     authors: (people.filter(Boolean).length ? people : [meta('author', 'article:author', 'parsely-author', 'sailthru.author', 'dc.creator')])
       .filter((a) => a && !/^https?:/.test(a)).join(', '),
-    publisher: meta('og:site_name', 'application-name') || nameOf(story.publisher),
+    publisher,
     published: (meta('article:published_time', 'datePublished', 'parsely-pub-date', 'sailthru.date', 'dc.date', 'date') || String(story.datePublished || '')
       || d.querySelector('time[datetime]')?.getAttribute('datetime') || '').slice(0, 10),
     words: total,
