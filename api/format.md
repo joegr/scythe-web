@@ -7,6 +7,8 @@ cards/<n>.md     a card: JSON front matter (the record), then the card as Scythe
 sources/<n>.md   a source: JSON front matter, then the article's verbatim text
 scythe.json      the team's shared settings: labels, custom topics, the library's file and block order
 names.json       the team's names: people and organizations it added, and its verdicts on who a name is
+cases/<n>.md     a case: JSON front matter (id, title), then the case in Markdown
+rounds/<n>.md    a round the timer kept: JSON front matter (its times and what was opened when), then the notes
 ```
 
 ## cards/&lt;n&gt;.md
@@ -99,6 +101,47 @@ The server indexes every saved card with spaCy (`en_core_web_sm`):
 The front matter holds `id`, `title`, `url`, `publisher`, `published`, `authors`, `cite` and `fetched`, and, once any card of it is marked, `spans`: the debaters' marks, with UTF-16 offsets into the source's text, shared by every card cut from it. Only the server writes a source's `spans`. The article's verbatim text follows the closing `---` and never changes.
 
 `published` may be a day (`2024-03-15`), a month (`2024-03`) or a year (`2024`). Cards carry it as written, as `published` in `/api/cards` and `/api/search`.
+
+## rounds/&lt;n&gt;.md
+
+A round the timer kept, saved when it ends (features/25). The clock itself runs on the device; only the finished
+round comes to the server, as one commit.
+
+```
+---
+{
+  "id": 3,
+  "title": "Round 2 vs Lincoln",
+  "format": "LD",
+  "started": "2026-10-24T14:00:12Z",
+  "ended": "2026-10-24T14:47:03Z",
+  "blocks": [
+    {"name": "Affirmative Constructive", "short": "1AC", "seconds": 360, "used": 362},
+    {"name": "Cross-Examination", "short": "CX", "seconds": 180, "used": 171}
+  ],
+  "prep": {"sides": ["Affirmative", "Negative"], "seconds": 240, "used": [180, 240]},
+  "cases": [4],
+  "log": [
+    {"at": "2026-10-24T14:00:15Z", "during": "Affirmative Constructive", "did": "began"},
+    {"at": "2026-10-24T14:01:30Z", "during": "Affirmative Constructive", "did": "opened case", "case": 4},
+    {"at": "2026-10-24T14:09:02Z", "during": "Negative Constructive", "did": "found card", "card": 12, "query": "soot"},
+    {"at": "2026-10-24T14:09:04Z", "during": "Negative Constructive", "did": "opened card", "card": 12},
+    {"at": "2026-10-24T14:20:41Z", "during": "Negative prep", "did": "scanned card", "card": 30}
+  ]
+}
+---
+
+Judge wanted more weighing.
+```
+
+- **`format`** is `LD`, `PF`, `Policy`, or the name the debater gave their custom times.
+- **`blocks`** are the round's speeches in order: `seconds` is the time allowed, `used` the time the clock ran (more than allowed when a speech ran over; 0 for one never started).
+- **`prep`** names the two sides and each one's prep: allowed (`seconds`) and used.
+- **`log`** is what was done while the clock ran, oldest first. `at` is UTC; `during` is the speech or prep the clock was on. `did` is one of `began` (a speech or prep started), `opened card`, `found card` (picked from search; `query` is what was searched), `scanned card`, or `opened case`.
+- **`by`**, in a round teammates followed live, is the member who did it.
+- **`cases`** are the cases opened during the round. The server works them out from the log.
+- **The notes** follow the front matter, as Markdown. They may be empty.
+- A round is saved once, when it ends. The server numbers it and refuses one that's malformed (`422`).
 
 ## scythe.json labels
 

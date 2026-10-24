@@ -6,6 +6,7 @@ import Scan from '../components/Scan'
 import { receivePage, type ReadPage } from '../lib/bookmarklet'
 import { isMobile, listCards as listScans } from '../lib/scan'
 import { countWords, pasteOver, sanitizeText, tooLongCard, WORDS } from '../lib/text'
+import { note } from '../lib/round'
 import { createCard, createSource, listCards, type CardDoc } from '../lib/store'
 import { topicLabel, useTopic } from '../lib/topic'
 import { useSignedIn } from '../lib/session'
@@ -92,7 +93,7 @@ export default function HomePage({ scan = false }: { scan?: boolean }) {
       {recent?.map((c) => <CardView key={c.number} card={c} mode="read" />)}
       <Reader open={reader} page={page} onClose={() => { setReader(false); setPage(null) }} onCut={(n) => navigate(`/cards/${n}`)} />
       {signedIn && <Scan open={!!scanning} start={scanning || 'camera'} onClose={() => { setScanning(false); if (scan) navigate('/') }}
-        onSaved={(n) => { setScanning(false); navigate(`/cards/${n}`) }}
+        onSaved={(n) => { note('scanned card', { card: n }); setScanning(false); navigate(`/cards/${n}`) }}
         onSavedBrief={(name) => { setScanning(false); navigate(`/search?brief=${encodeURIComponent(name)}`) }} />}
     </div>
   )

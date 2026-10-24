@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import SignIn from './components/SignIn'
+import TimerPage, { FloatingClock } from './components/RoundTimer'
 import { api, config, me, SIGNED_OUT, type User } from './lib/api'
 import { turnOffPush } from './lib/push'
 import { LabelsContext, useLabelsLoader } from './lib/hooks'
@@ -140,6 +141,7 @@ function Shell({ error }: { error: string | null }) {
             <NavLink to="/library">library</NavLink>
             {/* The case editor is served by the team's server (/cases/), not part of this app. */}
             <a href={`${config.apiBase()}/cases/`}>cases</a>
+            <NavLink to="/timer">timer</NavLink>
             <NavLink to="/team">team</NavLink>
             <NavLink to="/labels">labels</NavLink>
             {user && <NavLink to="/account" title="Your account">{user.handle}</NavLink>}
@@ -161,8 +163,11 @@ function Shell({ error }: { error: string | null }) {
               <Route path="/data" element={<DataPage />} />
               <Route path="/labels" element={<LabelsPage />} />
               <Route path="/account" element={<AccountPage />} />
+              <Route path="/timer" element={<TimerPage />} />
             </Routes>
           </main>
+          {/* A round in progress floats over every page but the timer's own (features/25). */}
+          <FloatingClock />
         </div>
       </TopicProvider>
     </LabelsContext.Provider>
