@@ -228,3 +228,24 @@ textarea.card-tag.scan-line { font-weight: 600; }
 .scan-queue li { padding: .4em 0; border-bottom: 1px solid var(--rule); }
 .scan-group + .scan-group { margin-top: 1.5rem; }
 .scan-group h2 { padding-bottom: .3em; border-bottom: 2px solid var(--ink); }
+
+/* ---------- the round timer (features/25) ---------- */
+/* The clock is the one thing drawn large: a timer is read from across a room. Everything else keeps the one size. */
+.timer-clock { font-size: clamp(4.5rem, 22vw, 11rem); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+  text-align: center; margin: 1rem 0; }
+.timer-clock.over { text-decoration: underline; text-decoration-thickness: 6px; text-underline-offset: .12em; }
+.timer-speech, .timer-format { text-align: center; }
+.timer-controls, .timer-prep { justify-content: center; }
+.timer-controls .action { min-width: 8rem; text-align: center; justify-content: center; }
+.timer-blocks { padding-left: 0; list-style: none; }
+.timer-blocks li[aria-current="step"] .link { background: var(--button-on); box-shadow: inset 3px 0 0 var(--ink); }
+.timer-log li { font-variant-numeric: tabular-nums; }
+/* While a round runs, the clock floats in a corner over every page; on a phone, a bar across the bottom. */
+.timer-float { position: fixed; right: 1rem; bottom: 1rem; z-index: 4; display: flex; gap: .5rem; align-items: center;
+  background: var(--paper); border: 1px solid var(--ink); padding: .4rem .5rem .4rem .75rem; font-variant-numeric: tabular-nums; }
+.timer-float a { text-decoration: none; }
+.timer-float.over a { text-decoration: underline; text-decoration-thickness: 3px; }
+@media (max-width: 600px) {
+  .timer-float { left: 0; right: 0; bottom: 0; justify-content: space-between; border: 0; border-top: 1px solid var(--ink);
+    padding: .6rem 1rem calc(.6rem + env(safe-area-inset-bottom)); }
+}

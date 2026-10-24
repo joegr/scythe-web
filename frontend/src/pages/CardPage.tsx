@@ -15,6 +15,7 @@ import {
   acceptSuggestion, archiveCard, DivergedSave, force, getCard, ops, rebase, rejectSuggestion, save, spanKey, suggest,
   type Divergence as D, type Op,
 } from '../lib/store'
+import { note } from '../lib/round'
 import { topicLabel, useTopic } from '../lib/topic'
 
 /** Select text, press a label's key. Every change is a git commit to cards/<n>.md. */
@@ -36,6 +37,9 @@ export default function CardPage() {
   const [removing, setRemoving] = useState(false)
 
   useEffect(() => { if (card) setPlace({ file: card.file ?? '', block: card.block ?? '' }) }, [card?.file, card?.block]) // eslint-disable-line react-hooks/exhaustive-deps
+  // During a round, opening a card is noted, with when and during which speech (features/25): when its page opens,
+  // not when it's loaded, so a card glanced at and left is still noted.
+  useEffect(() => { if (Number.isInteger(n) && n > 0) note('opened card', { card: n }) }, [n])
   // Another card (followed from a link): it opens the way a card always does, names hidden and nothing chosen.
   useEffect(() => { setEntities(false); setActive(null); setSelection(null); setMessage(null); setRemoving(false) }, [n])
 
