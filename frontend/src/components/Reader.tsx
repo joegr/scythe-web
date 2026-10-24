@@ -1,17 +1,24 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CARDS_PER_SOURCE, countWords, htmlToText, pasteOver, safeUrl, sanitizeText, siteOf, SOURCE_FULL, tooLongSource, WORDS } from '../lib/text'
 import { ApiError, config } from '../lib/api'
+import { pastedPage, type ReadPage } from '../lib/bookmarklet'
 import { snapChars } from '../lib/doc'
 import { selectionRange } from '../lib/render'
 import { readPhoto } from '../lib/scan'
 import { cardsCutFrom, createCard, createSource, defaultCite, fetchSource, getSource, listSources, locate, type SourceDoc } from '../lib/store'
 import { topicLabel, useTopic } from '../lib/topic'
 import PhotoPick from './PhotoPick'
+import ReadHere from './ReadHere'
 
-interface Props { open: boolean; onClose: () => void; onCut: (card: number) => void; sourceNumber?: number | null }
+interface Props {
+  open: boolean; onClose: () => void; onCut: (card: number) => void; sourceNumber?: number | null
+  /** A page sent from the debater's browser by the "Read in Scythe" bookmark: the paste form opens filled in with it.
+   *  'missing': the bookmark opened the reader, but the article's site kept the page from coming. */
+  page?: ReadPage | 'missing' | null
+}
 
 /** Reader: a source as clean text. Select a passage (or paste one to find it) and cut it verbatim. */
-export default function Reader({ open, onClose, onCut, sourceNumber }: Props) {
+export default function Reader({ open, onClose, onCut, sourceNumber, page }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
   const { current: topic, require, choose } = useTopic()
@@ -27,6 +34,8 @@ export default function Reader({ open, onClose, onCut, sourceNumber }: Props) {
   const [busy, setBusy] = useState(false)
   const [fetching, setFetching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The site refused Scythe's server: the bookmark that reads it in the debater's own browser goes under the message.
+  const [refused, setRefused] = useState(false)
   // Cards already cut from the open source (null: not known yet): one source gives at most CARDS_PER_SOURCE.
   const [cuts, setCuts] = useState<number | null>(null)
   // Only the source asked for last is shown: an earlier one that loads late (a slow click before a quick one) is dropped.
@@ -45,12 +54,25 @@ export default function Reader({ open, onClose, onCut, sourceNumber }: Props) {
     if (!open && d.open) d.close()
     if (!open) return
     setError(null)
+    setRefused(false)
     setRange(null)
+    if (page === 'missing') {
+      setMode('paste')
+      setNote('Nothing came from the article’s page: some sites keep their windows apart. On the article, click “Copy the article for Scythe”, then paste it in the article box here.')
+    } else if (page) fill(page)
     if (sourceNumber) openNumber(sourceNumber)
     else { asked.current++; setSource(null); listSources().then(setRecent).catch(() => {}) }
-  }, [open, sourceNumber]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, sourceNumber, page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { textRef.current?.querySelector('.reader-sel')?.scrollIntoView({ block: 'center' }) }, [range])
+
+  /** The bookmark's page in the paste form, to check against the article. */
+  function fill(page: ReadPage) {
+    setMode('paste')
+    setPaste({ text: page.text, title: page.title, url: page.url, authors: page.authors, publisher: page.publisher, published: page.published })
+    setNote(`Read from ${page.url ? siteOf(page.url) : 'the page'} in your browser.${page.words > WORDS.source
+      ? ` ${tooLongSource(page.words)} The first ${WORDS.source.toLocaleString()} words are filled in.` : ''} Check the words and details against the page, then read it.`)
+  }
 
   function load(s: SourceDoc) {
     setSource(s)
@@ -61,7 +83,7 @@ export default function Reader({ open, onClose, onCut, sourceNumber }: Props) {
   }
 
   async function run(fn: () => Promise<void>) {
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); setRefused(false)
     try { await fn() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
 
@@ -76,7 +98,7 @@ export default function Reader({ open, onClose, onCut, sourceNumber }: Props) {
         if (e instanceof ApiError && e.status === 422) {
           // The site refused, or the page has no article: the server says which, and what to do ("Open it in your
           // browser and paste the article's text instead; the link is kept."). The paste form opens with the link.
-          setMode('paste'); setPaste((p) => ({ ...p, url: url.trim() }))
+          setMode('paste'); setPaste((p) => ({ ...p, url: url.trim() })); setRefused(true)
           throw new Error(e.message || 'Couldn\'t read this page. Paste the article\'s text instead.')
         }
         throw e
@@ -148,6 +170,7 @@ export default function Reader({ open, onClose, onCut, sourceNumber }: Props) {
           <button className="link spacer" onClick={onClose}>close</button>
         </div>
         {error && <p className="error">{error}</p>}
+        {refused && !source && <ReadHere />}
 
         {!source ? (
           <div className="stack">
@@ -177,6 +200,9 @@ export default function Reader({ open, onClose, onCut, sourceNumber }: Props) {
                     onPaste={(e) => {
                       // An article over the limit isn't taken in: say so, and leave the field as it was.
                       const pasted = e.clipboardData.getData('text')
+                      // Copied by the bookmark's button on a site that keeps its windows apart: the whole form fills in.
+                      const sent = pastedPage(pasted)
+                      if (sent) { e.preventDefault(); setError(null); fill(sent); return }
                       const n = /^\s*</.test(pasted) ? null : pasteOver(e.currentTarget, pasted, WORDS.source)
                       if (n !== null) { e.preventDefault(); setError(tooLongSource(n)) }
                     }} />

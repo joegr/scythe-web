@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import CardView from '../components/CardView'
 import Reader from '../components/Reader'
 import Scan from '../components/Scan'
+import { receivePage, type ReadPage } from '../lib/bookmarklet'
 import { isMobile, listCards as listScans } from '../lib/scan'
 import { countWords, pasteOver, sanitizeText, tooLongCard, WORDS } from '../lib/text'
 import { createCard, createSource, listCards, type CardDoc } from '../lib/store'
@@ -15,6 +16,9 @@ export default function HomePage({ scan = false }: { scan?: boolean }) {
   const signedIn = useSignedIn()
   const { current, require, choose } = useTopic()
   const [reader, setReader] = useState(false)
+  // Opened by the "Read in Scythe" bookmark (#/?read=1): the page it sent fills the reader's paste form.
+  const [page, setPage] = useState<ReadPage | 'missing' | null>(null)
+  const reading = useSearchParams()[0].get('read') === '1'
   // The scanner sheet: closed, on the camera, or on the scans waiting to be checked (from any device).
   const [scanning, setScanning] = useState<false | 'camera' | 'queue'>(scan ? 'camera' : false)
   const [toCheck, setToCheck] = useState(0)
@@ -24,6 +28,16 @@ export default function HomePage({ scan = false }: { scan?: boolean }) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => { listCards({ limit: 15 }).then(setRecent).catch((e) => setError(e.message)) }, [])
+  useEffect(() => {
+    if (!reading) return
+    let live = true
+    receivePage().then((p) => {
+      if (!live) return
+      navigate('/', { replace: true })
+      setPage(p ?? 'missing'); setReader(true)
+    })
+    return () => { live = false }
+  }, [reading]) // eslint-disable-line react-hooks/exhaustive-deps
   // Scans waiting for this member, counted again each time the scanner closes. Not being able to count them hides
   // the link and nothing else.
   useEffect(() => { if (signedIn && !scanning) listScans().then((cs) => setToCheck(cs.length)).catch(() => setToCheck(0)) }, [signedIn, scanning])
@@ -76,7 +90,7 @@ export default function HomePage({ scan = false }: { scan?: boolean }) {
       {error && <p className="error">{error}</p>}
       {recent?.length === 0 && <p>No cards yet.</p>}
       {recent?.map((c) => <CardView key={c.number} card={c} mode="read" />)}
-      <Reader open={reader} onClose={() => setReader(false)} onCut={(n) => navigate(`/cards/${n}`)} />
+      <Reader open={reader} page={page} onClose={() => { setReader(false); setPage(null) }} onCut={(n) => navigate(`/cards/${n}`)} />
       {signedIn && <Scan open={!!scanning} start={scanning || 'camera'} onClose={() => { setScanning(false); if (scan) navigate('/') }}
         onSaved={(n) => { setScanning(false); navigate(`/cards/${n}`) }}
         onSavedBrief={(name) => { setScanning(false); navigate(`/search?brief=${encodeURIComponent(name)}`) }} />}
