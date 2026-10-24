@@ -300,6 +300,34 @@ export async function createCard(c: NewCard): Promise<number> {
   return (await api<{ number: number }>('POST', '/git/cards', { title: record.title, content: cardFile(record) })).number
 }
 
+/** Card #n as it was at commit `ref` (the history's "open this version"): to look at, not to edit; and its file. */
+export async function cardAt(n: number, ref: string): Promise<{ card: CardDoc; content: string } | null> {
+  const file = await readFile(`cards/${n}.md`, ref)
+  if (!file) return null
+  const record = parseCardFile(file.text)
+  return {
+    content: file.text,
+    card: {
+      number: n, title: record.title, state: 'closed', updated_at: '', author: '', published: null,
+      meta: { kind: 'card', text: record.text, cite: record.cite, url: record.url, source: record.source, topic: record.topic,
+        spans: record.spans, links: record.links },
+      topic: record.topic?.slug ?? null, file: record.file, block: record.block, approved: record.approved,
+      brief: record.brief ?? null, record, sha: file.sha, processed: true, suggestions: [], names: fileNames(record), namesToCheck: 0,
+    },
+  }
+}
+
+/** Put an earlier version back: saved as a new change on top of the card as it is now, so nothing is lost. */
+export async function putBack(card: CardDoc, content: string, when: string) {
+  if (!card.sha) throw new Error('Load the card first.')
+  await putCard(card.number, content, card.sha, `put back the version of ${when}`)
+}
+
+/** A removed card comes back as it last was (a new change; its removal stays in the history). */
+export async function bringBack(n: number) {
+  await api('POST', `/git/cards/${n}/restore`)
+}
+
 /** Remove = delete the file in a commit; the history keeps every version. */
 export async function archiveCard(card: CardDoc) {
   if (!card.sha) throw new Error('Load the card first.')

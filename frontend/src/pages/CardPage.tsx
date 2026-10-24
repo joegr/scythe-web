@@ -6,14 +6,14 @@ import History from '../components/History'
 import Links from '../components/Links'
 import { People } from '../components/People'
 import Reader from '../components/Reader'
-import { ApiError } from '../lib/api'
+import { ApiError, type Commit } from '../lib/api'
 import { snapChars, type SpanRec } from '../lib/doc'
 import { useCard, useLabels } from '../lib/hooks'
 import { namesToCheck, settleName, type Verdict } from '../lib/names'
-import { useSignedIn } from '../lib/session'
+import { useSignedIn, useUser } from '../lib/session'
 import {
-  acceptSuggestion, archiveCard, DivergedSave, force, getCard, ops, rebase, rejectSuggestion, save, spanKey, suggest,
-  type Divergence as D, type Op,
+  acceptSuggestion, archiveCard, bringBack, cardAt, DivergedSave, force, getCard, ops, putBack, rebase, rejectSuggestion, save, spanKey, suggest,
+  type CardDoc, type Divergence as D, type Op,
 } from '../lib/store'
 import { topicLabel, useTopic } from '../lib/topic'
 
@@ -34,10 +34,13 @@ export default function CardPage() {
   const [reader, setReader] = useState(false)
   const [place, setPlace] = useState({ file: '', block: '' })
   const [removing, setRemoving] = useState(false)
+  // An earlier version opened from the history, shown in the card's place until put back or closed.
+  const [version, setVersion] = useState<{ commit: Commit; card: CardDoc; content: string } | null>(null)
+  const me = useUser()?.handle
 
   useEffect(() => { if (card) setPlace({ file: card.file ?? '', block: card.block ?? '' }) }, [card?.file, card?.block]) // eslint-disable-line react-hooks/exhaustive-deps
   // Another card (followed from a link): it opens the way a card always does, names hidden and nothing chosen.
-  useEffect(() => { setEntities(false); setActive(null); setSelection(null); setMessage(null); setRemoving(false) }, [n])
+  useEffect(() => { setEntities(false); setActive(null); setSelection(null); setMessage(null); setRemoving(false); setVersion(null) }, [n])
 
   // Followed from a case (#/cards/12?words=33-60): mark the words it reads.
   const words = useSearchParams()[0].get('words')
@@ -155,7 +158,11 @@ export default function CardPage() {
 
   return (
     <div className="stack">
-      {signedIn && card.state === 'open' && (
+      {signedIn && card.state === 'closed' && (
+        <p className="note no-print">This card was removed; its history keeps every version.{' '}
+          <button className="link" disabled={saving} onClick={() => run(async () => { await bringBack(n); return getCard(n) })}>bring back</button></p>
+      )}
+      {signedIn && card.state === 'open' && !version && (
         <div className="row no-print">
           {labels.map((l) => (
             <button key={`${l.key}-${l.name}`} className="link" disabled={!selection || !editable} onMouseDown={(e) => e.preventDefault()} onClick={() => apply(l.name)}>
@@ -166,7 +173,18 @@ export default function CardPage() {
         </div>
       )}
 
-      <CardView card={card} link={false} editable={!!editable} showEntities={entities}
+      {version ? (
+        <section className="stack">
+          <p className="note no-print">The card as it was on {new Date(version.commit.date).toLocaleString()}.{' '}
+            {editable && <button className="action" onClick={() => {
+              const when = new Date(version.commit.date).toLocaleString()
+              setVersion(null)
+              run(async () => { await putBack(card, version.content, when); return getCard(n) })
+            }}>Put this version back</button>}{' '}
+            <button className="link" onClick={() => setVersion(null)}>back to the latest</button></p>
+          <CardView card={version.card} link={false} />
+        </section>
+      ) : <CardView card={card} link={false} editable={!!editable} showEntities={entities}
         activeKey={active ? spanKey(active) : null} mark={selection} onSpanClick={pick}
         onSelect={(r) => { const s = r ? snapChars(card.meta.text, r[0], r[1]) : null; setSelection(s); setFromCase(false); if (s) setActive(null) }}
         onChange={(patch) => {
@@ -176,7 +194,7 @@ export default function CardPage() {
         onSettle={settle}
         meta={editable && <button className="link" onClick={() => commit(ops.approve(!card.approved))}
           title={card.approved ? 'Take it back: the card isn’t ready for rounds.' : 'Approve when the card is cut and checked, ready for rounds.'}>
-          {card.approved ? 'unapprove' : 'approve'}</button>} />
+          {card.approved ? 'unapprove' : 'approve'}</button>} />}
 
       <p className="no-print">
         {message ? message : active?.id !== undefined ? (
@@ -222,7 +240,12 @@ export default function CardPage() {
         )}
       </section>
 
-      <History path={`cards/${card.number}.md`} refreshKey={card.sha} />
+      <History path={`cards/${card.number}.md`} refreshKey={card.sha} me={me}
+        onOpen={(c) => run(async () => {
+          const got = await cardAt(n, c.sha)
+          if (got) setVersion({ commit: c, ...got }); else setMessage('That version can’t be read.')
+          return card
+        })} />
 
       <section className="row">
         {card.meta.source && <button className="link" onClick={() => setReader(true)}>source #{card.meta.source}</button>}
