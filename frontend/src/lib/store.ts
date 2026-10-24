@@ -382,7 +382,8 @@ export function defaultCite(s: { title: string; authors: string[]; publisher: st
   const date = s.published ? (() => { const [y, m, d] = s.published!.split('-').map(Number); return [m, d, y].filter((n) => n !== undefined && !Number.isNaN(n)).join('-') })() : ''
   const first = s.authors[0]?.trim() ?? ''
   const name = isOrg(first) ? first : first.split(/\s+/).pop()
-  const head = s.authors.length ? `${name}${year ? ` ${year}` : ''}` : year ? `${(s.publisher || 'Unknown').split(',')[0]} ${year}` : ''
+  // A source with no date says so ("Robock No Date"), as debaters write it, rather than leave the year off unremarked.
+  const head = s.authors.length ? `${name} ${year || 'No Date'}` : year ? `${(s.publisher || 'Unknown').split(',')[0]} ${year}` : ''
   return [head, s.authors.join(', '), s.title ? `"${s.title}"` : '', s.publisher, date, s.url ?? ''].filter(Boolean).join(', ')
 }
 
