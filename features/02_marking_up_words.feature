@@ -60,7 +60,7 @@ Feature: Marking up words in a card
     And I switch to the plain text view
     Then the plain text reads "<u>Soot from burning cities would ==block sunlight==</u> for a decade."
 
-  @missing @signed-in
+  @built @signed-in
   Scenario: Pressing the same key again takes the mark off
     Given the card has a "highlight" span over "block sunlight"
     When I open the card
@@ -68,8 +68,7 @@ Feature: Marking up words in a card
     And I press "2"
     Then the card in git has no "highlight" span over "block sunlight"
 
-  @partly @signed-in
-  # today: nothing happens and nothing is said; the "no words" message only shows for a non-empty selection
+  @built @signed-in
   Scenario: A selection with no words in it is refused out loud
     When I open the card
     And I select only the space after "Soot" in the card
@@ -77,8 +76,7 @@ Feature: Marking up words in a card
     Then I see "That selection has no words in it."
     And no commit is made to the card
 
-  @partly @signed-in
-  # today: the Labels page asks for a "spans key" and draws custom marks as a 2px underline nobody can tell apart
+  @built @signed-in
   Scenario: A team adds its own mark for its own drills
     When the team adds a mark "warrant" on key "4"
     And I select "block sunlight" in the card and press "4"

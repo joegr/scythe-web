@@ -110,7 +110,9 @@ export default function CardPage() {
     if (!selection || !label || !card) return
     window.getSelection()?.removeAllRanges()
     setSelection(null)
-    try { commit(ops.addSpan(card.meta.text, label, selection[0], selection[1])) } catch (e) { setMessage((e as Error).message) }
+    // The same key again over the same words takes that mark off.
+    const same = card.meta.spans.find((s) => s.label === label.name && s.key === label.key && s.start_char === selection[0] && s.end_char === selection[1])
+    try { commit(same ? ops.removeSpan(card.meta.text, same) : ops.addSpan(card.meta.text, label, selection[0], selection[1])) } catch (e) { setMessage((e as Error).message) }
   }, [selection, labels, card, commit])
 
   const editable = signedIn && card?.state === 'open' && !saving && !diverged
@@ -126,6 +128,11 @@ export default function CardPage() {
       }
       const label = labels.find((l) => l.hotkey && l.hotkey === e.key)
       if (label && selection) { e.preventDefault(); apply(label.name); return }
+      // Only spaces selected: say so, rather than do nothing.
+      const sel = window.getSelection()
+      if (label && sel && !sel.isCollapsed && !sel.toString().trim() && document.querySelector('.card .token-text')?.contains(sel.anchorNode)) {
+        e.preventDefault(); setMessage('That selection has no words in it.'); return
+      }
       if ((e.key === 'Backspace' || e.key === 'Delete') && active) { e.preventDefault(); setActive(null); commit(ops.removeSpan(card.meta.text, active)); return }
       if (e.key === 'Escape') { setActive(null); setSelection(null); window.getSelection()?.removeAllRanges() }
     }

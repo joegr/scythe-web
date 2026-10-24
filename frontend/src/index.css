@@ -91,7 +91,9 @@ kbd { font: inherit; border-bottom: 1px solid var(--ink); }
 .t-hl { text-decoration-thickness: 3px; }
 .t-em { text-decoration-style: double; text-decoration-thickness: 1px; }
 .t-hl.t-em { text-decoration-thickness: 2px; }
-.t-custom { text-decoration-line: underline; text-decoration-thickness: 2px; text-underline-offset: .22em; }
+/* A team's own mark: a wavy line, so it isn't mistaken for Scythe's three; pointing at it names it (.mark-tip). */
+.t-custom { text-decoration: underline wavy var(--ink); text-decoration-thickness: 1px; text-underline-offset: .25em; text-decoration-skip-ink: none; }
+.mark-tip { position: fixed; transform: translateY(calc(-100% - 4px)); background: var(--paper); border: 1px solid var(--ink); padding: 0 .35em; pointer-events: none; z-index: 30; }
 .t-ner { text-decoration: underline dotted var(--ink); text-underline-offset: .3em; }
 /* A name the team has checked holds a steady thin line; one a new card still waits on is dashed and heavier, so it
    reads as a question (a name the team knows from another card but this card still asks for is dashed too). */
