@@ -307,8 +307,10 @@ function sync() {
     dirty = false
     publishing = true
     const live = r.live
+    // The version moves on only when this device takes in the round at it (listen): taking it from the publish
+    // would skip a teammate's log entry that landed just before.
     publish(live.ticket, null, shared(r, live.offset))
-      .then((got) => { if (round?.live && round.id === r.id) set({ ...round, live: { ...round.live, version: Math.max(round.live.version, got.version), trouble: null } }) })
+      .then(() => { if (round?.live?.trouble && round.id === r.id) set({ ...round, live: { ...round.live, trouble: null } }) })
       .catch((e) => {
         if (e instanceof LiveError && e.status === 409) return // taken over: the next change says by whom
         dirty = true
@@ -353,6 +355,14 @@ async function listen(id: string, signal: AbortSignal) {
       if (got && round?.id === id && round.live) set(adopt(round, got, round.live))
     } catch (e) {
       if (signal.aborted) return
+      if (e instanceof LiveError && e.status === 404 && round?.id === id && round.live?.driving) {
+        // Not there for the driver: its first publish hasn't landed yet, or the service restarted and forgot it.
+        // The driver's device is the record, so it publishes the round again, and keeps listening.
+        dirty = true
+        sync()
+        await new Promise((ok) => setTimeout(ok, 500))
+        continue
+      }
       if (e instanceof LiveError && e.status === 404) {
         // The driver closed it (saved, or let it go): a follower's round ends here, theirs to save, not this device's.
         if (round?.id === id && round.live && !round.live.driving) {
