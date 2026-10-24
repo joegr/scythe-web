@@ -148,6 +148,9 @@ export function during(r: Round): string {
   return r.running && r.running.what !== 'speech' ? `${r.format.prep.sides[r.running.what]} prep` : r.format.blocks[r.current].name
 }
 
+/** The live round in progress, if any: a scan sent during it is tagged by the shared service with its speech. */
+export const liveRoundId = (): string | undefined => (round?.live && !round.ended && !round.live.closed ? round.id : undefined)
+
 /** Whether this device may change the clock: a local round, or a live one it drives. */
 export const drives = (r: Round) => !r.live || r.live.driving
 

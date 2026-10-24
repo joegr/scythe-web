@@ -389,6 +389,19 @@
             "title": "At",
             "type": "string"
           },
+          "by": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 0,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
           "card": {
             "anyOf": [
               {
@@ -481,6 +494,18 @@
           }
         },
         "title": "InviteIn",
+        "type": "object"
+      },
+      "LiveIn": {
+        "properties": {
+          "round": {
+            "default": "*",
+            "pattern": "^(\\*|[A-Za-z0-9_-]{6,64})$",
+            "title": "Round",
+            "type": "string"
+          }
+        },
+        "title": "LiveIn",
         "type": "object"
       },
       "LoginIn": {
@@ -694,6 +719,18 @@
               }
             ],
             "title": "Read At"
+          },
+          "round": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round"
           },
           "status": {
             "title": "Status",
@@ -2830,6 +2867,32 @@
         ]
       }
     },
+    "/api/rounds/live": {
+      "post": {
+        "description": "A ticket to the shared service where live rounds run (scythe-ocr's rounds.py): this team, this member, this\nround (or `*`: any of the team's, to list them), for twelve hours. The clock itself never comes through here.",
+        "operationId": "live_ticket",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Live Ticket",
+        "tags": [
+          "rounds"
+        ]
+      }
+    },
     "/api/rounds/{n}": {
       "get": {
         "operationId": "get_round",
@@ -2880,6 +2943,17 @@
                       }
                     ],
                     "title": "Quad"
+                  },
+                  "round": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Round"
                   }
                 },
                 "required": [
@@ -3363,6 +3437,17 @@
                     "format": "binary",
                     "title": "Photo",
                     "type": "string"
+                  },
+                  "round": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Round"
                   }
                 },
                 "required": [

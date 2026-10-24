@@ -7,6 +7,7 @@
  */
 import { api, ApiError, config } from './api'
 import type { SpanRec, TopicRef } from './doc'
+import { liveRoundId } from './round'
 
 export interface ScanDraft { tag: string; cite: string; body: string; text: string; markdown: string; spans: SpanRec[] }
 export type ScanKind = 'screenshot' | 'photo'
@@ -186,7 +187,9 @@ function pictureForm(picture: Blob, kind: ScanKind, fields: Record<string, strin
  *  for a photo, where to square it up to (fractions). */
 export function sendPage(picture: Blob, kind: ScanKind, opts: { brief?: number; ordinal?: number; corners?: number[]; onWait?: () => void } = {}): Promise<Page> {
   if (picture.size > MAX_BYTES) return Promise.reject(new Error('That picture is too large (12 MB at most).'))
-  const form = pictureForm(picture, kind, { brief: opts.brief, ordinal: opts.ordinal, corners: opts.corners && JSON.stringify(opts.corners) })
+  // Sent during a live round, the page comes back tagged with the round and the speech it was taken in (features/25).
+  const form = pictureForm(picture, kind, { brief: opts.brief, ordinal: opts.ordinal, corners: opts.corners && JSON.stringify(opts.corners),
+    round: liveRoundId() })
   return whileWaking(() => api<Page>('POST', '/scan/pages', form), opts.onWait)
 }
 /** Read the page again: as the other kind, or from corners the member dragged. Its cards are replaced once read. */
