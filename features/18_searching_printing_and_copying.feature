@@ -31,6 +31,13 @@ Feature: Searching, printing and copying
     Then the print shows the tag "Searchable soot <run>"
     And the print shows "block sunlight" highlighted
 
+  @built @mvp
+  Scenario: Print the read-aloud version, the marked words alone
+    When I open the card's print page
+    And I turn on "read-aloud"
+    Then the print shows "block sunlight"
+    And the print doesn't show "for a decade"
+
   @built @signed-in @mvp
   Scenario: Copy into Word with Verbatim formatting
     Given I am signed in to the team's evidence

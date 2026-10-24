@@ -18,6 +18,7 @@ Feature: A card's history, and removing a card
       | underline: "Soot from burning cities" (#<n>) |
       | card: History <run> (#<n>)                    |
     And each history entry names who made it
+    And no one's email is in the history, on screen or in what the server sends
 
   @partly @signed-in
   # today: each entry shows a 7-character commit id and the raw commit message
