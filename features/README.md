@@ -83,7 +83,8 @@ The table is rebuilt on `main` after every merge (`.github/workflows/features-ta
 | `21_joining_a_team.feature` | 5 | 0 | 0 |
 | `22_scanning_a_brief.feature` | 4 | 0 | 0 |
 | `23_who_a_card_names.feature` | 8 | 0 | 0 |
-| **All 23** | **130** | **23** | **10** |
+| `24_reading_in_your_own_browser.feature` | 8 | 0 | 0 |
+| **All 24** | **138** | **23** | **10** |
 
 ## Running them
 

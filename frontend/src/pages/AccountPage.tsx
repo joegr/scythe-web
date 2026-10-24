@@ -4,6 +4,7 @@ import { appleConfigured, linkApple } from '../lib/apple'
 import { createPasskey, passkeysSupported } from '../lib/passkey'
 import { pushSubscription, pushSupported, testPush, turnOffPush, turnOnPush } from '../lib/push'
 import { useSession } from '../lib/session'
+import ReadHere from '../components/ReadHere'
 
 interface Passkey { id: number; name: string; synced: boolean; created_at: string; last_used_at: string | null }
 interface Invite {
@@ -100,6 +101,11 @@ export default function AccountPage() {
               onClick={() => act(() => api('PATCH', '/auth/me', { nudges: true, email: user.email ? null : nudgeEmail }), 'Nudges are on.')}>Turn on nudges</button>
           </div>
         )}
+      </section>
+
+      <section className="gap">
+        <h2>Reading in your browser</h2>
+        <ReadHere account />
       </section>
 
       <Notifications />
