@@ -4,6 +4,7 @@ import Autocomplete from '../components/Autocomplete'
 import CardView from '../components/CardView'
 import { useDebounced } from '../lib/hooks'
 import { listCards, NSDA_TOPICS, searchCards, searchPerson, type Found, type SearchSort } from '../lib/store'
+import { note } from '../lib/round'
 import { dateWords, monthOf } from '../lib/text'
 import { topicLabel } from '../lib/topic'
 
@@ -92,7 +93,7 @@ export default function SearchPage() {
             </>
           )}
           complete={(f) => f.card.title}
-          onSelect={(f) => navigate(`/cards/${f.card.number}`)}
+          onSelect={(f) => { note('found card', { card: f.card.number, query: q.trim() }); navigate(`/cards/${f.card.number}`) }}
           emptyText="No cards with those words."
         />
         <div className="row">
@@ -122,7 +123,11 @@ export default function SearchPage() {
       </div>
       {error && <p className="error">{error}</p>}
       {/* Each view gets its own list, so nothing from the last one lingers while the next loads. */}
-      <div className="content stack" key={`${view}|${sort}|${month}|${topic}|${person}|${brief}`}>
+      {/* A card picked from the results during a round is noted with what was searched (features/25). */}
+      <div className="content stack" key={`${view}|${sort}|${month}|${topic}|${person}|${brief}`} onClickCapture={(e) => {
+        const n = /#\/cards\/(\d+)$/.exec((e.target as Element).closest?.('a')?.getAttribute('href') ?? '')
+        if (n) note('found card', { card: Number(n[1]), ...(dq.trim() ? { query: dq.trim() } : {}) })
+      }}>
         {results === null && !error && <p>Searching…</p>}
         {results && <p>{count(results, view)}</p>}
         {results?.map((f, i) => {
