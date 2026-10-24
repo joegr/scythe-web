@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { CARDS_PER_SOURCE, countWords, htmlToText, pasteOver, safeUrl, sanitizeText, siteOf, SOURCE_FULL, tooLongSource, WORDS } from '../lib/text'
+import { CARDS_PER_SOURCE, countWords, htmlToText, parseAuthors, pasteOver, safeUrl, sanitizeText, siteOf, SOURCE_FULL, tooLongSource, WORDS } from '../lib/text'
 import { ApiError, config } from '../lib/api'
 import { pastedPage, type ReadPage } from '../lib/bookmarklet'
 import { snapChars } from '../lib/doc'
@@ -110,7 +110,7 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
     }
     const isHtml = /^\s*</.test(paste.text)
     const parsed = isHtml ? htmlToText(paste.text) : { title: '', text: sanitizeText(paste.text) }
-    const authors = paste.authors.split(/;|,/).map((a) => a.trim()).filter(Boolean)
+    const authors = parseAuthors(paste.authors)
     const meta = { title: paste.title || parsed.title || parsed.text.slice(0, 80), url: paste.url || null, publisher: paste.publisher,
       published: paste.published || null, authors }
     load(await getSource(await createSource({ ...meta, text: parsed.text, cite: defaultCite(meta) })))
@@ -244,7 +244,8 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
                   )}
                   <input className="field" placeholder="Title" maxLength={1000} value={paste.title} onChange={(e) => setPaste({ ...paste, title: e.target.value })} />
                   <input className="field" placeholder="Link" maxLength={2048} value={paste.url} onChange={(e) => setPaste({ ...paste, url: e.target.value })} />
-                  <input className="field" placeholder="Authors, separated by commas" maxLength={2000} value={paste.authors} onChange={(e) => setPaste({ ...paste, authors: e.target.value })} />
+                  <input className="field" placeholder="Authors, separated by commas"
+                    title="Alan Robock, Owen Toon; or last name first with semicolons between people: Robock, Alan; Toon, Owen" maxLength={2000} value={paste.authors} onChange={(e) => setPaste({ ...paste, authors: e.target.value })} />
                   <div className="row">
                     <input className="field" style={{ flex: 2 }} placeholder="Publication" maxLength={300} value={paste.publisher} onChange={(e) => setPaste({ ...paste, publisher: e.target.value })} />
                     <input className="field" style={{ flex: 1 }} placeholder="Date, YYYY-MM-DD" maxLength={10} value={paste.published} onChange={(e) => setPaste({ ...paste, published: e.target.value })} />

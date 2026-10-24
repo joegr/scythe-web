@@ -26,6 +26,15 @@ export function sanitizeText(text: string): string {
 }
 
 /** Pasted page HTML -> paragraphs, in the browser. */
+/** Authors as typed, one person each: "Alan Robock, Owen Toon"; or, with semicolons between people, "Robock, Alan;
+ *  Toon, Owen" (last name first, as library cites write them); or one person last name first, "Robock, Alan". */
+export function parseAuthors(typed: string): string[] {
+  const flip = (a: string) => { const [last, first] = a.split(',').map((s) => s.trim()); return first ? `${first} ${last}` : last }
+  if (typed.includes(';')) return typed.split(';').map((a) => a.trim()).filter(Boolean).map((a) => (a.includes(',') ? flip(a) : a))
+  const parts = typed.split(',').map((a) => a.trim()).filter(Boolean)
+  return parts.length === 2 && parts.every((p) => !/\s/.test(p)) ? [`${parts[1]} ${parts[0]}`] : parts
+}
+
 export function htmlToText(html: string): { title: string; text: string } {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   doc.querySelectorAll('script, style, nav, header, footer, aside, form, noscript').forEach((n) => n.remove())

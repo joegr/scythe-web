@@ -46,8 +46,7 @@ Feature: Pasting an article
       Crops fail.
       """
 
-  @partly @signed-in
-  # today: "Robock, Alan" becomes two authors, "Robock" and "Alan"
+  @built @signed-in
   Scenario: An author written "Last, First" stays one person
     When I paste an article with authors "Robock, Alan; Toon, Owen"
     Then the source's front matter has "authors" ["Alan Robock", "Owen Toon"]
