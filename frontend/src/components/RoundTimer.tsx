@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import type { LiveSummary } from '../lib/live'
 import {
-  clock, close, customFormats, end, forgetFormat, FORMATS, goTo, keepFormat, lengthOf, openCase, prepLeft, ran, save,
-  setNotes, speechLeft, start, teamCases, toggleSpeech, togglePrep, useRound,
+  clock, close, customFormats, drives, end, follow, forgetFormat, FORMATS, goTo, keepFormat, lengthOf, openCase, prepLeft,
+  ran, save, setNotes, speechLeft, start, takeOverRound, teamCases, teamRounds, toggleSpeech, togglePrep, useRound,
   type CaseRef, type Format, type Round, type SavedRound,
 } from '../lib/round'
+import { useSignedIn } from '../lib/session'
 
 /** The current time, every quarter second while something runs. */
 function useNow(running: boolean): number {
@@ -34,7 +36,9 @@ function Formats() {
   return (
     <section className="stack timer-start">
       <h2>Timer</h2>
-      <p>Choose the round’s format. The clock runs on this device; when the round ends, you can save it to the team’s record.</p>
+      <p>Choose the round’s format. The clock runs on this device, and teammates can follow it on theirs; when the round
+        ends, you can save it to the team’s record.</p>
+      <Following />
       <div className="row">
         {FORMATS.map((f) => <button key={f.name} className="action" onClick={() => start(f)}>{f.name}</button>)}
         {custom.map((f) => (
@@ -46,6 +50,40 @@ function Formats() {
         ))}
         <button className="link" onClick={() => setWriting(true)}>custom times</button>
       </div>
+    </section>
+  )
+}
+
+/** Teammates' rounds running now: follow one, and see the same clock as whoever drives it. */
+function Following() {
+  const signedIn = useSignedIn()
+  const [rounds, setRounds] = useState<LiveSummary[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (!signedIn) return
+    let gone = false
+    const look = () => teamRounds().then((r) => { if (!gone) setRounds(r.rounds.filter((x) => !x.ended)) }).catch(() => { /* no shared service: nothing to follow */ })
+    look()
+    const t = setInterval(look, 10_000)
+    return () => { gone = true; clearInterval(t) }
+  }, [signedIn])
+  if (!rounds?.length) return null
+  return (
+    <section>
+      <h3>Running now</h3>
+      <ul className="list">
+        {rounds.map((r) => (
+          <li key={r.id} className="row">
+            <span>{r.driver}’s {r.format ?? ''} round</span>
+            <button className="link" disabled={busy} onClick={async () => {
+              setBusy(true); setError(null)
+              try { await follow(r.id) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+            }}>follow</button>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="error">{error}</p>}
     </section>
   )
 }
@@ -121,16 +159,24 @@ function Running({ r }: { r: Round }) {
   const speech = r.format.blocks[r.current]
   const left = speechLeft(r, now)
   const speaking = r.running?.what === 'speech'
+  const mine = drives(r)
   return (
     <section className="stack timer">
       <p className="timer-format">{r.format.name} · {r.current + 1} of {r.format.blocks.length}</p>
+      {r.live && (
+        <p className="timer-live" role="status">
+          {r.live.driving ? 'Live: teammates can follow this clock.' : <>Following {r.live.driver}’s clock. <button className="link"
+            onClick={() => void takeOverRound()}>take over</button></>}
+          {r.live.trouble ? ` ${r.live.trouble}` : ''}
+        </p>
+      )}
       <h2 className="timer-speech">{speech.short ? `${speech.short} · ` : ''}{speech.name}</h2>
       <div className={`timer-clock${left < 0 ? ' over' : ''}${speaking ? ' running' : ''}`} role="timer" aria-live="off"
         aria-label={`${speech.name}: ${clock(left)}${speaking ? ', running' : ', stopped'}`}>{clock(left)}</div>
       <div className="row timer-controls">
-        <button className="link" disabled={r.current === 0} onClick={() => goTo(r.current - 1)}>previous</button>
-        <button className="action" onClick={toggleSpeech}>{speaking ? 'stop' : ran(r, 'speech', now) > 0 ? 'resume' : 'start'}</button>
-        <button className="link" disabled={r.current === r.format.blocks.length - 1} onClick={() => goTo(r.current + 1)}>next speech</button>
+        <button className="link" disabled={!mine || r.current === 0} onClick={() => goTo(r.current - 1)}>previous</button>
+        <button className="action" disabled={!mine} onClick={toggleSpeech}>{speaking ? 'stop' : ran(r, 'speech', now) > 0 ? 'resume' : 'start'}</button>
+        <button className="link" disabled={!mine || r.current === r.format.blocks.length - 1} onClick={() => goTo(r.current + 1)}>next speech</button>
       </div>
 
       {r.format.prep.seconds > 0 && (
@@ -139,7 +185,7 @@ function Running({ r }: { r: Round }) {
             const prepping = r.running?.what === side
             const p = prepLeft(r, side, now)
             return (
-              <button key={side} className={`link${prepping ? ' on' : ''}`} aria-pressed={prepping} onClick={() => togglePrep(side)}
+              <button key={side} className={`link${prepping ? ' on' : ''}`} aria-pressed={prepping} disabled={!mine} onClick={() => togglePrep(side)}
                 aria-label={`${r.format.prep.sides[side]} prep: ${clock(p)}${prepping ? ', running' : ''}`}>
                 {r.format.prep.sides[side]} prep {clock(p)}{prepping ? ' · stop' : ''}
               </button>
@@ -151,7 +197,7 @@ function Running({ r }: { r: Round }) {
       <ol className="timer-blocks">
         {r.format.blocks.map((x, i) => (
           <li key={i} aria-current={i === r.current ? 'step' : undefined}>
-            <button className="link plain" onClick={() => goTo(i)}>
+            <button className="link plain" disabled={!mine} onClick={() => goTo(i)}>
               {x.short ? `${x.short} · ` : ''}{x.name} · {clock(x.seconds * 1000)}{r.used[i] ? ` · ran ${clock(r.used[i])}` : ''}
             </button>
           </li>
@@ -164,7 +210,10 @@ function Running({ r }: { r: Round }) {
         <textarea className="field" rows={4} maxLength={50_000} value={r.notes} onChange={(e) => setNotes(e.target.value)}
           placeholder="What the judge said, what to fix." />
       </label>
-      <div className="row"><button className="link" onClick={end}>end the round</button></div>
+      <div className="row">
+        {mine ? <button className="link" onClick={end}>end the round</button>
+          : <button className="link" onClick={close}>stop following</button>}
+      </div>
     </section>
   )
 }
@@ -198,6 +247,7 @@ function Log({ r }: { r: Round }) {
             {time(e.at)} · {e.during} · {e.did}{' '}
             {e.card ? <Link to={`/cards/${e.card}`}>#{e.card}</Link> : e.case ? `${e.case}` : ''}
             {e.query ? ` (searched “${e.query}”)` : ''}
+            {e.by && r.live ? ` · ${e.by}` : ''}
           </li>
         ))}
       </ul>
@@ -214,6 +264,18 @@ function Ended({ r }: { r: Round }) {
   const [saved, setSaved] = useState<SavedRound | null>(null)
   const navigate = useNavigate()
   const another = (f: Format) => { close(); start(f) }
+
+  // Following a teammate's round: they save it, with everyone's work in its log.
+  if (!drives(r)) return (
+    <section className="stack timer-start">
+      <h2>The round is over</h2>
+      <p>{r.live!.closed ? `${r.live!.driver} closed the round.` : `${r.live!.driver} saves it to the team’s record, with what you opened.`}</p>
+      <div className="row">
+        <button className="action" onClick={close}>done</button>
+        <button className="link" onClick={() => another(r.format)}>start your own {r.format.name} round</button>
+      </div>
+    </section>
+  )
 
   if (saved) return (
     <section className="stack timer-start">
@@ -268,8 +330,8 @@ export function FloatingClock() {
   return (
     <div className={`timer-float no-print${left < 0 ? ' over' : ''}`} role="timer" aria-label={`${label}: ${clock(left)}${r.running ? ', running' : ', stopped'}`}>
       <Link to="/timer" title="Open the timer">{label} {clock(left)}</Link>
-      {prepping === null && <button className="link" onClick={toggleSpeech}>{r.running ? 'stop' : 'start'}</button>}
-      {prepping !== null && <button className="link" onClick={() => togglePrep(prepping)}>stop</button>}
+      {drives(r) && prepping === null && <button className="link" onClick={toggleSpeech}>{r.running ? 'stop' : 'start'}</button>}
+      {drives(r) && prepping !== null && <button className="link" onClick={() => togglePrep(prepping)}>stop</button>}
     </div>
   )
 }

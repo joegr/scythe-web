@@ -14,6 +14,14 @@ Feature: Timing a round
   format, its times, when it started and ended, the cases used, what was opened when, and the notes. Then
   another round starts, or the timer goes away.
 
+  Teammates share a round's clock. The debater who starts a round drives it: their device is the time of
+  record. Teammates signed in to the same team see it running and can follow it; their screens count down from
+  the same start times, so every one shows the same second, and each change (start, stop, the next speech)
+  reaches them within a second. Only the driver changes the clock, until a teammate takes it over. What a
+  teammate opens goes into the same round, in their name, and the driver saves it with everyone's work. The
+  live round runs on the shared service beside scanning, which tags a card scanned during a round with the
+  round and the speech it was taken in. Without that service, the clock still runs on the device.
+
   Times are the NSDA's: LD speeches 6, 3, 7, 3, 4, 6 and 3 minutes, with 4 minutes of prep a side; PF 4, 4, 3,
   4, 4, 3, 3, 3, 3, 2 and 2, with 3 minutes of prep a side (its speeches are named first and second, since a coin
   flip decides which side speaks first); Policy 8 for each constructive, 3 for each cross-examination and 5 for
@@ -122,3 +130,32 @@ Feature: Timing a round
     And I start the clock
     And I scan a card and save it
     Then the round notes that I scanned the card during "First Affirmative Constructive"
+
+  @built @two-debaters
+  Scenario: A teammate follows the same clock
+    Given Ana and Ben are signed in to the team's evidence
+    When Ana starts an "LD" round and starts the clock
+    And Ben follows Ana's round
+    Then Ben's clock reads what Ana's does, to the second
+    And Ben can't change the clock
+    When Ana goes to the next speech
+    Then within a second Ben's timer is on "Cross-Examination of the Affirmative"
+
+  @built @two-debaters
+  Scenario: What a teammate opens goes into the round, in their name
+    Given Ana and Ben are signed in to the team's evidence
+    When Ana starts an "LD" round and starts the clock
+    And Ben follows Ana's round
+    And Ben opens the card
+    And Ana ends the round and saves it
+    Then the team's record has the round, with the card opened by Ben
+    And Ben sees that Ana saves the round
+
+  @built @two-debaters
+  Scenario: A teammate takes over the clock
+    Given Ana and Ben are signed in to the team's evidence
+    When Ana starts an "LD" round and starts the clock
+    And Ben follows Ana's round
+    And Ben takes over the clock and stops it
+    Then within a second Ana's clock is stopped too
+    And Ana can't change the clock

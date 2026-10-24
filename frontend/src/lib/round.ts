@@ -3,9 +3,16 @@
  * elapsed time, never a ticking count, so a reload, a trip to the case editor or a sleeping laptop loses nothing.
  * While a round is on, what the debater opens is written down with when and during which speech. When it ends, it
  * goes to the team's record once, as rounds/<n>.md (api/format.md).
+ *
+ * Signed in, a round is also live (lib/live.ts): the debater who starts it drives, and teammates follow the same
+ * clock on their own devices. What any of them opens goes into the round's one log, with who did it.
  */
 import { useSyncExternalStore } from 'react'
 import { api, config } from './api'
+import {
+  addLog, closeLive, listLive, LiveError, measureOffset, nextChange, publish, takeOver, ticketFor,
+  type LiveRound, type LiveSummary, type Ticket,
+} from './live'
 
 export interface Block { name: string; short: string; seconds: number }
 export interface Format { name: string; blocks: Block[]; prep: { sides: [string, string]; seconds: number } }
@@ -33,12 +40,29 @@ export const FORMATS: Format[] = [
 ]
 
 export type Did = 'began' | 'opened card' | 'found card' | 'scanned card' | 'opened case'
-export interface Entry { at: string; during: string; did: Did; card?: number; case?: number; query?: string }
+export interface Entry { at: string; during: string; did: Did; card?: number; case?: number; query?: string; by?: string }
 
-/** What's running: the speech the round is on, or one side's prep. `since` is when it started, in epoch ms. */
+/** What's running: the speech the round is on, or one side's prep. `since` is when it started, in this device's ms. */
 export type Running = { what: 'speech' | 0 | 1; since: number } | null
 
+/** A round shared through the shared service: who drives it, and how this device's clock lines up with the service's. */
+export interface Live {
+  ticket: Ticket
+  /** The service's clock minus this device's, in ms. */
+  offset: number
+  version: number
+  /** Whether this device drives the clock (the time of record). */
+  driving: boolean
+  driver: string
+  startedBy: string
+  /** Set when the service can't be reached; the clock keeps running here. */
+  trouble?: string | null
+  /** The driver closed the round (saved it, or let it go): a follower's copy is only to look at now. */
+  closed?: boolean
+}
+
 export interface Round {
+  id: string
   format: Format
   started: string
   current: number
@@ -50,13 +74,13 @@ export interface Round {
   notes: string
   /** Set once the round is over: it's then saved, or let go. */
   ended: string | null
+  live?: Live | null
 }
 
 // ---------------------------------------------------------------- storage: this browser only, shared by its tabs
 
 const ROUND = 'scythe:round'
 const CUSTOM = 'scythe:formats'
-const CHANGED = 'scythe:round-changed'
 
 function load<T>(key: string, fallback: T): T {
   try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback } catch { return fallback }
@@ -69,13 +93,14 @@ let round: Round | null = valid(load<Round | null>(ROUND, null))
 const listeners = new Set<() => void>()
 
 function valid(r: Round | null): Round | null {
-  return r && Array.isArray(r.format?.blocks) && r.format.blocks.length && Array.isArray(r.used) && Array.isArray(r.log) ? r : null
+  if (!(r && Array.isArray(r.format?.blocks) && r.format.blocks.length && Array.isArray(r.used) && Array.isArray(r.log))) return null
+  return r.id ? r : { ...r, id: newId() }
 }
 function set(next: Round | null) {
   round = next
   keep(ROUND, next)
   listeners.forEach((f) => f())
-  window.dispatchEvent(new Event(CHANGED))
+  sync()
 }
 // Another tab (or the case editor's page) changed the round: read it again.
 window.addEventListener('storage', (e) => {
@@ -88,6 +113,8 @@ window.addEventListener('storage', (e) => {
 export function useRound(): Round | null {
   return useSyncExternalStore((f) => { listeners.add(f); return () => listeners.delete(f) }, () => round)
 }
+
+const newId = () => `round-${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`
 
 // ---------------------------------------------------------------- the clock's arithmetic
 
@@ -121,6 +148,9 @@ export function during(r: Round): string {
   return r.running && r.running.what !== 'speech' ? `${r.format.prep.sides[r.running.what]} prep` : r.format.blocks[r.current].name
 }
 
+/** Whether this device may change the clock: a local round, or a live one it drives. */
+export const drives = (r: Round) => !r.live || r.live.driving
+
 // ---------------------------------------------------------------- running a round
 
 const now = () => Date.now()
@@ -138,43 +168,60 @@ function settle(r: Round, at = now()): Round {
   return { ...r, prepUsed, running: null }
 }
 
+/** A change to the clock, by the device that drives it: kept here, then published to teammates. */
+function change(next: Round) {
+  set(next)
+  if (next.live?.driving) dirty = true
+  sync()
+}
+
 export function start(format: Format) {
-  set({ format, started: iso(), current: 0, used: format.blocks.map(() => 0), prepUsed: [0, 0], running: null, log: [], notes: '', ended: null })
+  set({ id: newId(), format, started: iso(), current: 0, used: format.blocks.map(() => 0), prepUsed: [0, 0], running: null,
+    log: [], notes: '', ended: null, live: null })
+  if (config.token()) void goLive()
 }
 
 /** Start or stop the speech clock. Starting it stops any prep. */
 export function toggleSpeech() {
-  if (!round || round.ended) return
-  if (round.running?.what === 'speech') { set(settle(round)); return }
+  if (!round || round.ended || !drives(round)) return
+  if (round.running?.what === 'speech') { change(settle(round)); return }
   const r = settle(round)
   const at = now()
-  set({ ...r, running: { what: 'speech', since: at }, log: [...r.log, { at: iso(at), during: r.format.blocks[r.current].name, did: 'began' }] })
+  const began: Entry = { at: iso(at), during: r.format.blocks[r.current].name, did: 'began' }
+  change({ ...r, running: { what: 'speech', since: at }, log: [...r.log, began] })
+  share(began)
 }
 
 /** Start or stop one side's prep. Starting it stops the speech clock. */
 export function togglePrep(side: 0 | 1) {
-  if (!round || round.ended) return
-  if (round.running?.what === side) { set(settle(round)); return }
+  if (!round || round.ended || !drives(round)) return
+  if (round.running?.what === side) { change(settle(round)); return }
   const r = settle(round)
   const at = now()
-  set({ ...r, running: { what: side, since: at }, log: [...r.log, { at: iso(at), during: `${r.format.prep.sides[side]} prep`, did: 'began' }] })
+  const began: Entry = { at: iso(at), during: `${r.format.prep.sides[side]} prep`, did: 'began' }
+  change({ ...r, running: { what: side, since: at }, log: [...r.log, began] })
+  share(began)
 }
 
 /** Go to another speech; the clock stops, ready for it. */
 export function goTo(i: number) {
-  if (!round || round.ended || i < 0 || i >= round.format.blocks.length) return
-  set({ ...settle(round), current: i })
+  if (!round || round.ended || !drives(round) || i < 0 || i >= round.format.blocks.length) return
+  change({ ...settle(round), current: i })
 }
 
 export const setNotes = (notes: string) => { if (round) set({ ...round, notes }) }
 
 /** The round is over: the clock stops, and what's left is notes and saving. */
 export function end() {
-  if (round && !round.ended) set({ ...settle(round), ended: iso() })
+  if (round && !round.ended && drives(round)) change({ ...settle(round), ended: iso() })
 }
 
-/** Let the round go, saved or not. */
-export const close = () => set(null)
+/** Let the round go, saved or not. The driver closes it for everyone; a follower just stops following. */
+export function close() {
+  const r = round
+  set(null)
+  if (r?.live?.driving) void closeLive(r.live.ticket).catch(() => { /* it expires on its own */ })
+}
 
 /** Note what the debater did, if a round is on. Opening the same thing twice in a row, moments apart, is once. */
 export function note(did: Exclude<Did, 'began'>, what: { card?: number; case?: number; query?: string }) {
@@ -182,7 +229,9 @@ export function note(did: Exclude<Did, 'began'>, what: { card?: number; case?: n
   const last = round.log[round.log.length - 1]
   const at = now()
   if (last && last.did === did && last.card === what.card && last.case === what.case && at - Date.parse(last.at) < 10_000) return
-  set({ ...round, log: [...round.log, { at: iso(at), during: during(round), did, ...what }] })
+  const entry: Entry = { at: iso(at), during: during(round), did, ...what, ...(round.live ? { by: round.live.ticket.member } : {}) }
+  set({ ...round, log: [...round.log, entry] })
+  share(entry)
 }
 
 /** The round as the server takes it (POST /api/rounds). */
@@ -201,7 +250,148 @@ export interface SavedRound { id: number; title: string; format: string; cases: 
 /** Save the ended round to the team's record. It stays here until it's saved, so a failed save loses nothing. */
 export async function save(title: string): Promise<SavedRound> {
   if (!round?.ended) throw new Error('End the round before saving it.')
+  if (!drives(round)) throw new Error(`${round.live!.driver} saves this round.`)
   return api<SavedRound>('POST', '/rounds', body(round, title))
+}
+
+// ---------------------------------------------------------------- live: driving, following, and the shared log
+
+let dirty = false // the driver's clock changed and hasn't been published yet
+let publishing = false
+let following: { id: string; stop: AbortController } | null = null
+let outbox: Entry[] = [] // log entries not yet added to the live round
+
+/** The clock as teammates get it: start times in the service's clock. */
+function shared(r: Round, offset: number) {
+  return { format: r.format, started: r.started, current: r.current, used: r.used, prepUsed: r.prepUsed,
+    running: r.running && { ...r.running, since: r.running.since + offset }, ended: r.ended }
+}
+
+/** A live round's clock and log, as this device keeps them. */
+function adopt(r: Round, remote: LiveRound, live: Live): Round {
+  const me = live.ticket.member
+  const driving = remote.driver === me
+  const next: Round = { ...r, log: (remote.log as unknown as Entry[]) ?? r.log,
+    live: { ...live, version: remote.version, driving, driver: remote.driver, startedBy: remote.started_by, trouble: null } }
+  if (driving && live.driving) return next // the driver's own clock is the record: only the log comes back
+  const s = remote.state as unknown as Round & { running: Running }
+  return { ...next, format: s.format, started: s.started, current: s.current, used: s.used, prepUsed: s.prepUsed,
+    ended: s.ended ?? null, running: s.running && { ...s.running, since: s.running.since - live.offset } }
+}
+
+const trouble = (message: string) => { if (round?.live) set({ ...round, live: { ...round.live, trouble: message } }) }
+
+/** Make the round in progress live: a ticket, this device's offset from the service, and the first publish. */
+async function goLive() {
+  const r = round
+  if (!r) return
+  try {
+    const ticket = await ticketFor(r.id)
+    const offset = await measureOffset(ticket.service)
+    if (round?.id !== r.id) return // let go meanwhile
+    const live: Live = { ticket, offset, version: 0, driving: true, driver: ticket.member, startedBy: ticket.member }
+    round = { ...round, live, log: round.log.map((e) => ({ ...e, by: ticket.member })) }
+    outbox = [...round.log] // what happened before the round went live goes into its shared log too
+    dirty = true
+    set(round)
+  } catch {
+    // No shared service, or it can't be reached: the round stays on this device, as the timer always could.
+  }
+}
+
+/** Publish the driver's clock when it has changed, one publish at a time; and keep following the round. */
+function sync() {
+  const r = round
+  if (!r?.live || r.live.closed) { following?.stop.abort(); following = null; return }
+  if (dirty && r.live.driving && !publishing) {
+    dirty = false
+    publishing = true
+    const live = r.live
+    publish(live.ticket, null, shared(r, live.offset))
+      .then((got) => { if (round?.live && round.id === r.id) set({ ...round, live: { ...round.live, version: Math.max(round.live.version, got.version), trouble: null } }) })
+      .catch((e) => {
+        if (e instanceof LiveError && e.status === 409) return // taken over: the next change says by whom
+        dirty = true
+        trouble((e as Error).message)
+      })
+      .finally(() => { publishing = false; if (dirty) setTimeout(sync, 2000) })
+  }
+  if (outbox.length && !publishing) flush(r.live)
+  if (following?.id !== r.id) { following?.stop.abort(); following = { id: r.id, stop: new AbortController() }; void listen(r.id, following.stop.signal) }
+}
+
+function share(entry: Entry) {
+  if (!round?.live) return
+  outbox.push({ ...entry, by: round.live.ticket.member })
+  flush(round.live)
+}
+
+let flushing = false
+function flush(live: Live) {
+  if (flushing || !outbox.length) return
+  flushing = true
+  const sending = outbox
+  outbox = []
+  addLog(live.ticket, sending)
+    .then(() => { flushing = false; if (outbox.length && round?.live) flush(round.live) })
+    .catch(() => {
+      // Kept, and sent again shortly: what a debater opened never waits on some other change to the round.
+      outbox = [...sending, ...outbox]
+      flushing = false
+      setTimeout(() => { if (round?.live && !round.live.closed) flush(round.live) }, 2000)
+    })
+}
+
+/** Wait on the service for each change to the round, and take it in, until the round here changes or goes. */
+async function listen(id: string, signal: AbortSignal) {
+  let backoff = 1000
+  while (!signal.aborted && round?.id === id && round.live && !round.live.closed) {
+    const live = round.live
+    try {
+      const got = await nextChange(live.ticket, live.version, signal)
+      backoff = 1000
+      if (got && round?.id === id && round.live) set(adopt(round, got, round.live))
+    } catch (e) {
+      if (signal.aborted) return
+      if (e instanceof LiveError && e.status === 404) {
+        // The driver closed it (saved, or let it go): a follower's round ends here, theirs to save, not this device's.
+        if (round?.id === id && round.live && !round.live.driving) {
+          set({ ...settle(round), ended: round.ended ?? iso(), live: { ...round.live, closed: true, trouble: null } })
+        }
+        return
+      }
+      trouble((e as Error).message)
+      await new Promise((ok) => setTimeout(ok, backoff))
+      backoff = Math.min(backoff * 2, 15_000)
+    }
+  }
+}
+
+/** The team's rounds running now, to follow. */
+export async function teamRounds(): Promise<{ ticket: Ticket; rounds: LiveSummary[] }> {
+  const ticket = await ticketFor('*')
+  return { ticket, rounds: await listLive(ticket) }
+}
+
+/** Follow a teammate's round: the same clock, theirs to drive. */
+export async function follow(id: string) {
+  const ticket = await ticketFor(id)
+  const offset = await measureOffset(ticket.service)
+  const remote = await nextChange(ticket, 0, new AbortController().signal)
+  if (!remote) throw new Error('That round isn’t running any more.')
+  const live: Live = { ticket, offset, version: 0, driving: false, driver: remote.driver, startedBy: remote.started_by }
+  const s = remote.state as unknown as Round
+  const base: Round = { id, format: s.format, started: s.started, current: 0, used: [], prepUsed: [0, 0], running: null,
+    log: [], notes: '', ended: null, live }
+  outbox = []
+  set(adopt(base, remote, live))
+}
+
+/** Drive a teammate's round from this device: theirs ran out of battery, or they handed it over. */
+export async function takeOverRound() {
+  if (!round?.live || round.live.driving) return
+  const got = await takeOver(round.live.ticket)
+  if (round?.live) set({ ...round, live: { ...round.live, driving: got.driver === round.live.ticket.member, driver: got.driver, version: got.version } })
 }
 
 // ---------------------------------------------------------------- custom times, kept on this device
@@ -233,3 +423,6 @@ export function openCase(n: number) {
   note('opened case', { case: n })
   window.open(`${config.apiBase()}/cases/${n}/`, '_blank', 'noopener')
 }
+
+// A live round in progress picks up where it was after a reload.
+if (round?.live) queueMicrotask(sync)

@@ -138,6 +138,7 @@ Judge wanted more weighing.
 - **`blocks`** are the round's speeches in order: `seconds` is the time allowed, `used` the time the clock ran (more than allowed when a speech ran over; 0 for one never started).
 - **`prep`** names the two sides and each one's prep: allowed (`seconds`) and used.
 - **`log`** is what was done while the clock ran, oldest first. `at` is UTC; `during` is the speech or prep the clock was on. `did` is one of `began` (a speech or prep started), `opened card`, `found card` (picked from search; `query` is what was searched), `scanned card`, or `opened case`.
+- **`by`**, in a round teammates followed live, is the member who did it.
 - **`cases`** are the cases opened during the round. The server works them out from the log.
 - **The notes** follow the front matter, as Markdown. They may be empty.
 - A round is saved once, when it ends. The server numbers it and refuses one that's malformed (`422`).
