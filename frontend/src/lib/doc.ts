@@ -38,6 +38,32 @@ export const LINK_WORDS: Record<string, string> = {
 }
 export const normalize = (body: string | null | undefined) => (body ?? '').replace(/\r\n/g, '\n')
 
+const MARKED: Record<string, string> = { underline: 'underlined', highlight: 'highlighted', emphasis: 'emphasized' }
+
+/** A change to a card, as a sentence: "You highlighted “block sunlight”", "ana took the underline off “Soot”" (the
+ *  history, features/16, and a partner's save first, 17). The commit message is the record's; this is how a debater
+ *  reads it. The iPhone's ScytheKit changeSentence says the same. */
+export function changeSentence(message: string, who: string): string {
+  const m = message.split('\n')[0].replace(/\s*\(#\d+\)\s*$/, '')
+  let r: RegExpExecArray | null
+  if ((r = /^card: (.*)$/.exec(m))) return `${who} cut the card “${r[1]}”`
+  if ((r = /^title: "(.*)"$/.exec(m))) return `${who} retagged it “${r[1]}”`
+  if (/^cite: "(.*)"$/.test(m)) return `${who} rewrote the cite`
+  if ((r = /^remove ([^:]+): "(.*)"$/.exec(m))) return `${who} took the ${r[1]} off “${r[2]}”`
+  if ((r = /^([^:]+): "(.*)"$/.exec(m))) return MARKED[r[1]] ? `${who} ${MARKED[r[1]]} “${r[2]}”` : `${who} marked “${r[2]}” ${r[1]}`
+  if ((r = /^file: (.*?) \/ (.*)$/.exec(m))) return `${who} filed it under ${r[1]}${r[2].trim() ? `, ${r[2].trim()}` : ''}`
+  if (m === 'unfile') return `${who} took it out of its file`
+  if (m === 'approve') return `${who} approved it`
+  if (m === 'unapprove') return `${who} took the approval back`
+  if (/^topic: /.test(m)) return `${who} set its resolution`
+  if (/^archive: /.test(m)) return `${who} removed the card`
+  if (/^bring back: /.test(m)) return `${who} brought the card back`
+  if ((r = /^put back the version of (.*)$/.exec(m))) return `${who} put back the version of ${r[1]}`
+  if ((r = /^unlink (.+) #(\d+)$/.exec(m))) return `${who} took off the link to card ${r[2]}`
+  if ((r = /^(.+) #(\d+)$/.exec(m))) return `${who} linked it: ${(LINK_WORDS[r[1].replace(' ', '_')] ?? r[1]).toLowerCase()} card ${r[2]}`
+  return `${who} changed it: ${m}`
+}
+
 // ---------------------------------------------------------------- Markdown (the server reads the same format)
 
 const INLINE = /([\\`*_[\]<>=~|])/g

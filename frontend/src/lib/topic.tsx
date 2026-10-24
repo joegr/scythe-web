@@ -12,7 +12,7 @@ interface TopicCtx {
 }
 
 /** The picker was closed without a topic. Its message is empty, so a page that shows errors shows nothing. */
-export class PickerClosed extends Error {
+class PickerClosed extends Error {
   constructor() { super(''); this.name = 'PickerClosed' }
 }
 

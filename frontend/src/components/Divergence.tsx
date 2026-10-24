@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
-import type { CardFile, SpanRec } from '../lib/doc'
+import { changeSentence as sentence, type CardFile, type SpanRec } from '../lib/doc'
 import type { Divergence as D } from '../lib/store'
-import { sentence } from './History'
 
 const show = (f: CardFile, s: SpanRec) => `${s.label} “${f.text.slice(s.start_char, s.end_char).slice(0, 50)}”`
 const keyOf = (s: SpanRec) => `${s.key}|${s.label}|${s.start_char}|${s.end_char}`
