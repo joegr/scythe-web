@@ -74,9 +74,10 @@ export default function Reader({ open, onClose, onCut, sourceNumber }: Props) {
         if (ticket === asked.current) load(s)
       } catch (e) {
         if (e instanceof ApiError && e.status === 422) {
-          // A paywall, a PDF, a page with no article: paste it instead, with the link kept.
+          // The site refused, or the page has no article: the server says which, and what to do ("Open it in your
+          // browser and paste the article's text instead; the link is kept."). The paste form opens with the link.
           setMode('paste'); setPaste((p) => ({ ...p, url: url.trim() }))
-          throw new Error('Couldn\'t read this page. Paste the article\'s text instead.')
+          throw new Error(e.message || 'Couldn\'t read this page. Paste the article\'s text instead.')
         }
         throw e
       } finally { setFetching(false) }
