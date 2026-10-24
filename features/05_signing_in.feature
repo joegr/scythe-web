@@ -115,6 +115,16 @@ Feature: Signing in
     And I press "1"
     Then the latest commit to the card is by me
 
+  @built @signed-in @mvp
+  Scenario: The same cards on a laptop and a phone
+    Every device reads the team's one record, so a mark made on one shows on the next.
+    Given I am signed in to the team's evidence
+    And a card "Everywhere <run>" with the text "Soot from burning cities would block sunlight."
+    When I open the card
+    And I select "Soot" in the card
+    And I press "1"
+    Then on my phone, signed in as me, the card shows "Soot" marked
+
   @built
   Scenario: Signing out is in the top bar, and asks first
     Given I am signed in to the team's evidence
