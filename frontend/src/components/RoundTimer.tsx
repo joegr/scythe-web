@@ -196,7 +196,7 @@ function Log({ r }: { r: Round }) {
         {shown.map((e, i) => (
           <li key={i}>
             {time(e.at)} · {e.during} · {e.did}{' '}
-            {e.card ? <Link to={`/cards/${e.card}`}>#{e.card}</Link> : e.case ? `case ${e.case}` : ''}
+            {e.card ? <Link to={`/cards/${e.card}`}>#{e.card}</Link> : e.case ? `${e.case}` : ''}
             {e.query ? ` (searched “${e.query}”)` : ''}
           </li>
         ))}
