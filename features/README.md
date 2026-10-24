@@ -60,32 +60,32 @@ The table is rebuilt on `main` after every merge (`.github/workflows/features-ta
 
 | Feature | Built | Partly | Missing |
 | --- | ---: | ---: | ---: |
-| `01_cutting_a_card.feature` | 9 | 0 | 2 |
-| `02_marking_up_words.feature` | 9 | 2 | 1 |
-| `03_tag_and_cite.feature` | 5 | 2 | 0 |
-| `04_reading_a_card.feature` | 3 | 1 | 1 |
-| `05_signing_in.feature` | 12 | 0 | 0 |
-| `06_scythe_reads_the_card.feature` | 4 | 1 | 0 |
+| `01_cutting_a_card.feature` | 11 | 0 | 0 |
+| `02_marking_up_words.feature` | 12 | 0 | 0 |
+| `03_tag_and_cite.feature` | 7 | 0 | 0 |
+| `04_reading_a_card.feature` | 4 | 0 | 1 |
+| `05_signing_in.feature` | 13 | 0 | 0 |
+| `06_scythe_reads_the_card.feature` | 5 | 0 | 0 |
 | `07_names_places_and_dates.feature` | 3 | 0 | 0 |
 | `08_suggested_highlights.feature` | 5 | 0 | 0 |
-| `09_opening_an_article_by_link.feature` | 5 | 1 | 1 |
-| `10_pasting_an_article.feature` | 4 | 2 | 0 |
-| `11_finding_a_copied_passage.feature` | 2 | 1 | 1 |
-| `12_the_source_shelf.feature` | 4 | 1 | 1 |
-| `13_choosing_the_resolution.feature` | 5 | 3 | 0 |
-| `14_files_blocks_and_approval.feature` | 3 | 2 | 1 |
-| `15_answering_and_linking_cards.feature` | 4 | 3 | 0 |
-| `16_card_history_and_removing.feature` | 1 | 2 | 2 |
-| `17_two_debaters_one_card.feature` | 4 | 2 | 0 |
-| `18_searching_printing_and_copying.feature` | 11 | 0 | 0 |
+| `09_opening_an_article_by_link.feature` | 7 | 0 | 0 |
+| `10_pasting_an_article.feature` | 6 | 0 | 0 |
+| `11_finding_a_copied_passage.feature` | 4 | 0 | 0 |
+| `12_the_source_shelf.feature` | 6 | 0 | 0 |
+| `13_choosing_the_resolution.feature` | 8 | 0 | 0 |
+| `14_files_blocks_and_approval.feature` | 6 | 0 | 0 |
+| `15_answering_and_linking_cards.feature` | 7 | 0 | 0 |
+| `16_card_history_and_removing.feature` | 5 | 0 | 0 |
+| `17_two_debaters_one_card.feature` | 6 | 0 | 0 |
+| `18_searching_printing_and_copying.feature` | 12 | 0 | 0 |
 | `19_scanning_a_card.feature` | 8 | 0 | 0 |
 | `20_writing_a_case.feature` | 12 | 0 | 0 |
-| `21_joining_a_team.feature` | 5 | 0 | 0 |
+| `21_joining_a_team.feature` | 8 | 0 | 0 |
 | `22_scanning_a_brief.feature` | 4 | 0 | 0 |
 | `23_who_a_card_names.feature` | 8 | 0 | 0 |
 | `24_reading_in_your_own_browser.feature` | 8 | 0 | 0 |
 | `25_timing_a_round.feature` | 14 | 0 | 1 |
-| **All 25** | **152** | **23** | **11** |
+| **All 25** | **189** | **0** | **2** |
 
 ## Running them
 
