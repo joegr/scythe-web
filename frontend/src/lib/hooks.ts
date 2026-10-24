@@ -27,19 +27,21 @@ export function useCard(n: number) {
     .catch((e) => { if (current.current === n) setError(e.message) }), [n])
   useEffect(() => { setCard(null); setError(null); reload() }, [reload])
   const waiting = card !== null && !card.processed && card.state === 'open'
+  // While Scythe checks the card's words, ask again, backing off to once a minute, for as long as it takes: the page
+  // never gets stuck on "Checking words…". Coming back to the tab asks at once.
   useEffect(() => {
     if (!waiting) return
-    const started = Date.now()
     let delay = 2_000
     let t: ReturnType<typeof setTimeout>
     const tick = () => {
-      if (Date.now() - started > 15 * 60_000) return
       reload()
       delay = Math.min(delay * 1.5, 60_000)
       t = setTimeout(tick, delay)
     }
     t = setTimeout(tick, delay)
-    return () => clearTimeout(t)
+    const back = () => { if (document.visibilityState === 'visible') reload() }
+    document.addEventListener('visibilitychange', back)
+    return () => { clearTimeout(t); document.removeEventListener('visibilitychange', back) }
   }, [waiting, reload])
   return { card, setCard, reload, error }
 }
