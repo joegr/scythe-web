@@ -33,8 +33,7 @@ Feature: Opening an article by its link
     Then the selection is the source's whole first paragraph
     And the find field holds the source's whole first paragraph
 
-  @partly @signed-in
-  # today: "Reading the article…", for the second or two the server takes
+  @built @signed-in
   Scenario: Waiting for the article says what's happening in plain words
     When I open the reader
     And I fetch the link "https://en.wikipedia.org/wiki/Nuclear_winter"
@@ -57,10 +56,11 @@ Feature: Opening an article by its link
     And I see "doesn't let Scythe read its pages. Open it in your browser and paste the article's text instead"
     And the paste form is open with the link already filled in
 
-  @missing @signed-in
+  @built @signed-in
   Scenario: The same link twice opens the same source
-    Given the source for "https://en.wikipedia.org/wiki/Nuclear_winter" is already in the team's evidence
-    When I fetch the link "https://en.wikipedia.org/wiki/Nuclear_winter"
+    Given the source for "https://en.wikipedia.org/wiki/Nuclear_winter?run=<run>" is already in the team's evidence
+    When I open the reader
+    And I fetch the link "https://en.wikipedia.org/wiki/Nuclear_winter?run=<run>"
     Then the reader opens that source at once
     And no new source is made
 

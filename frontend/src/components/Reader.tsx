@@ -257,9 +257,11 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
                 : 'The article’s text is kept exactly as you paste it, so every card cut from it is word for word.'}</p>}
               {mode !== 'photo' && (
                 <button className="action" disabled={busy || (mode === 'url' ? !url.trim() : !paste.text.trim() || (pastedWords ?? 0) > WORDS.source)} onClick={openSource}>
-                  {fetching ? 'Reading the article…' : busy ? 'Saving…' : 'Read'}
+                  {fetching ? 'Reading…' : busy ? 'Saving…' : 'Read'}
                 </button>
               )}
+              {/* Scythe reads politely (one page at a time per site, its rules first), so a fetch can take a while. */}
+              {fetching && <p className="note">Reading the article… this takes about a minute</p>}
             </div>
             {recent.length > 0 && (
               <ul className="list">
