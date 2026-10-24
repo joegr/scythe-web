@@ -35,7 +35,9 @@ function snapShown(el: HTMLElement, text: string): [number, number] | null {
 }
 
 /** Card text with formatting drawn as underlines only (thin / heavy / double). */
-export default function TokenText({ text, spans, condensed, editable, showEntities, activeKey, onSelect, onSpanClick, names, onName, mark }: Props) {
+export default function TokenText({ text, spans, condensed: readAloud, editable, showEntities, activeKey, onSelect, onSpanClick, names, onName, mark }: Props) {
+  // Read-aloud keeps only the marked words; a card with nothing marked yet shows all of its words instead of none.
+  const condensed = readAloud && spans.some((s) => s.key !== 'ents' && s.id === undefined)
   const visible = useMemo(() => spans.filter((s) => s.key !== 'ents' || showEntities), [spans, showEntities])
   const all = useMemo(() => (mark ? [...visible, { key: '_mark', label: '', style: '', src: '', start_char: mark[0], end_char: mark[1] }] : visible), [visible, mark])
 
