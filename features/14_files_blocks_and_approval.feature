@@ -39,8 +39,7 @@ Feature: Files, blocks and approval
     And I file it under file "Loose <run>" and no block
     Then the library shows "Loose <run>" with the card under "Unfiled"
 
-  @partly
-  # today: GitHub labels cut file names to 50 characters
+  @built
   Scenario: A long file name isn't cut short
     When I file a card under "Neg – Arctic militarization DA – Russia escalation links"
     Then the library shows the whole name

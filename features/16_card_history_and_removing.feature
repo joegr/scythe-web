@@ -35,8 +35,7 @@ Feature: A card's history, and removing a card
     Then the card shows no highlight
     And I can put that version back, which saves it as a new change
 
-  @partly @signed-in
-  # today: archive acts at once, with no question, and a failure does nothing visible
+  @built @signed-in
   Scenario: Removing a card asks first, and says if it failed
     When I open the card
     And I remove the card
