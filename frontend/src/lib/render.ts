@@ -84,6 +84,14 @@ export function domOffset(node: Node, offset: number): number | null {
   return node.nodeType === Node.TEXT_NODE ? base + offset : base + (offset > 0 ? (el.textContent?.length ?? 0) : 0)
 }
 
+/** The character offset of the caret (where a collapsed selection sits) inside `container`, or null. */
+export function caretOffset(container: HTMLElement): number | null {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0) return null
+  const r = sel.getRangeAt(0)
+  return container.contains(r.endContainer) ? domOffset(r.endContainer, r.endOffset) : null
+}
+
 export function selectionRange(container: HTMLElement): [number, number] | null {
   const sel = window.getSelection()
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null

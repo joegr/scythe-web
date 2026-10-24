@@ -3,7 +3,7 @@ import { CARDS_PER_SOURCE, countWords, htmlToText, pasteOver, safeUrl, sanitizeT
 import { ApiError, config } from '../lib/api'
 import { pastedPage, type ReadPage } from '../lib/bookmarklet'
 import { snapChars } from '../lib/doc'
-import { selectionRange } from '../lib/render'
+import { caretOffset, selectionRange } from '../lib/render'
 import { readPhoto } from '../lib/scan'
 import { cardsCutFrom, createCard, createSource, defaultCite, fetchSource, getSource, listSources, locate, type SourceDoc } from '../lib/store'
 import { topicLabel, useTopic } from '../lib/topic'
@@ -77,9 +77,12 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
   function load(s: SourceDoc) {
     setSource(s)
     setCuts(null)
+    keys.current = null
     const ticket = asked.current
     cardsCutFrom(s.number).then((n) => { if (ticket === asked.current) setCuts(n) }).catch(() => setCuts(null))
-    setForm((f) => ({ ...f, cite: s.head.cite || defaultCite(s.head) }))
+    // Back at a source cut from before: the cite, file and block as they were for its last cut, the tag empty.
+    const last = lastCut(s.number)
+    setForm((f) => ({ title: '', cite: last?.cite ?? (s.head.cite || defaultCite(s.head)), file: last?.file ?? f.file, block: last?.block ?? f.block }))
   }
 
   async function run(fn: () => Promise<void>) {
@@ -136,7 +139,8 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
     const title = form.title.trim() || firstWords(text)
     const card = await createCard({ text, title, cite: form.cite, url: source.head.url ?? '',
       source: source.number, topic: t, file: form.file || null, block: form.block || null })
-    setForm((f) => ({ ...f, title: '' })); setPassage(''); setRange(null)
+    keepCut(source.number, form)
+    setForm((f) => ({ ...f, title: '' })); setPassage(''); setRange(null); keys.current = null
     setCuts((n) => (n === null ? null : n + 1))
     onCut(card)
   })
@@ -146,6 +150,33 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
   const full = cuts !== null && cuts >= CARDS_PER_SOURCE
   const cutBlocked = picked > WORDS.card || full
   const pastedWords = /^\s*</.test(paste.text) ? null : countWords(paste.text)
+
+  // Cutting with the keyboard alone: with the caret in the text, Shift and the arrow keys move the selection's far end
+  // a character at a time (shown snapped to whole words, as a mouse selection is), and Cmd or Ctrl+Enter cuts.
+  const keys = useRef<{ anchor: number; focus: number } | null>(null)
+  useEffect(() => {
+    if (!source) return
+    const onKey = (e: KeyboardEvent) => {
+      const box = textRef.current
+      if (!box) return
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        if (range && form.title.trim() && !busy && !cutBlocked) { e.preventDefault(); cut() }
+        return
+      }
+      if (!e.shiftKey || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return
+      if ((e.target as HTMLElement | null)?.closest?.('input, textarea, select')) return
+      const k = keys.current ?? (() => { const at = caretOffset(box); return at === null ? null : { anchor: at, focus: at } })()
+      if (!k) return
+      e.preventDefault()
+      const focus = Math.max(0, Math.min(source.text.length, k.focus + (e.key === 'ArrowRight' ? 1 : -1)))
+      keys.current = { anchor: k.anchor, focus }
+      window.getSelection()?.removeAllRanges()
+      const s = k.anchor === focus ? null : snapChars(source.text, Math.min(k.anchor, focus), Math.max(k.anchor, focus))
+      if (s) pick(s); else setRange(null)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  })
 
   // The cut tooltip sits just above the selected words.
   const [tip, setTip] = useState<{ top: number; left: number } | null>(null)
@@ -251,6 +282,7 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
                 // The words picked show as the whole tokens they touch, as on a card (snapChars); the browser's
                 // ragged selection goes. A double click still takes the whole paragraph, after this.
                 const r = selectionRange(e.currentTarget), s = r && snapChars(source.text, r[0], r[1])
+                keys.current = null
                 if (s) { window.getSelection()?.removeAllRanges(); pick(s) }
               }}
               onDoubleClick={(e) => {
@@ -307,6 +339,17 @@ function Para({ start, text, range }: { start: number; text: string; range: [num
       {b < text.length && <span data-start={start + b}>{text.slice(b)}</span>}
     </p>
   )
+}
+
+/** What a source's last cut was filed with, on this device: a debater cutting card after card from one article keeps
+ *  its cite, file and block. */
+type CutForm = { cite: string; file: string; block: string }
+const cutKey = (source: number) => `scythe:cut:${source}`
+function lastCut(source: number): CutForm | null {
+  try { const raw = localStorage.getItem(cutKey(source)); return raw ? JSON.parse(raw) as CutForm : null } catch { return null }
+}
+function keepCut(source: number, { cite, file, block }: CutForm) {
+  try { localStorage.setItem(cutKey(source), JSON.stringify({ cite, file, block })) } catch { /* storage blocked: the form starts over */ }
 }
 
 /** A tag to start from: the passage's first words. */
