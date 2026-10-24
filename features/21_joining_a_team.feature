@@ -52,3 +52,31 @@ Feature: Joining a team
     When I let "waiting-<run>" in
     Then I see "is in."
     And the server lets "waiting-<run>" read the team's cards
+
+  @built @mvp
+  Scenario: An invite runs out after 14 days, and an admin can take it back
+    Given I am signed in as an admin of the team
+    When I open my account
+    And I make an invite
+    Then the newest invite is open and expires 14 days from today
+    When I revoke the newest invite
+    Then I see "Invite revoked."
+    And the server makes no account with that invite
+
+  @built @mvp
+  Scenario: A school code lets up to 500 people ask to join, for a year
+    Given I am signed in as an admin of the team
+    When I open my account
+    And I make a school code
+    Then the newest invite is open and expires a year from today
+    And the server has the school code down for 500 sign-ups
+
+  @built @mvp
+  Scenario: Removing a member signs them out everywhere
+    An admin removes someone from the team: every sign-in they have, on every device, stops at once.
+    Given "gone-<run>" is a member signed in on a laptop and a phone
+    And I am signed in as an admin of the team
+    When I open my account
+    And I remove "gone-<run>"
+    Then I see "gone-<run> was removed."
+    And neither of "gone-<run>"'s sign-ins reads the team's cards
