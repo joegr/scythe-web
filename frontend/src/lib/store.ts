@@ -362,13 +362,18 @@ const LOOSE: Record<string, string> = { "'": "['‘’]", '‘': "['‘’]", '�
 
 /** Find a copied passage in source text: exact, then whitespace- and quote-insensitive. */
 export function locate(full: string, passage: string): [number, number] | null {
+  return locateAll(full, passage)[0] ?? null
+}
+
+/** Every place the passage is in the text, in order: exactly, or else with loose spacing and quotes. */
+export function locateAll(full: string, passage: string): [number, number][] {
   const p = passage.trim()
-  if (!p) return null
-  const i = full.indexOf(p)
-  if (i >= 0) return [i, i + p.length]
+  if (!p) return []
+  const exact: [number, number][] = []
+  for (let i = full.indexOf(p); i >= 0; i = full.indexOf(p, i + 1)) exact.push([i, i + p.length])
+  if (exact.length) return exact
   const pattern = p.split(/\s+/).filter(Boolean).map((w) => [...w].map((ch) => LOOSE[ch] ?? ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('')).join('\\s+')
-  const m = new RegExp(pattern).exec(full)
-  return m ? [m.index, m.index + m[0].length] : null
+  return [...full.matchAll(new RegExp(pattern, 'g'))].map((m) => [m.index!, m.index! + m[0].length])
 }
 
 /** An author that's an organization ("Rutgers University-New Brunswick", "AP Staff"), cited by its whole name

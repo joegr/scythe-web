@@ -5,7 +5,7 @@ import { pastedPage, type ReadPage } from '../lib/bookmarklet'
 import { snapChars } from '../lib/doc'
 import { caretOffset, selectionRange } from '../lib/render'
 import { readPhoto } from '../lib/scan'
-import { cardsCutFrom, createCard, createSource, defaultCite, fetchSource, getSource, listSources, locate, type SourceDoc } from '../lib/store'
+import { cardsCutFrom, createCard, createSource, defaultCite, fetchSource, getSource, listSources, locateAll, type SourceDoc } from '../lib/store'
 import { topicLabel, useTopic } from '../lib/topic'
 import PhotoPick from './PhotoPick'
 import ReadHere from './ReadHere'
@@ -122,10 +122,21 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
     if (source) setPassage(source.text.slice(r[0], r[1]))
   }
 
+  // Every place the copied passage is, so a passage in the source twice can be stepped through; what went wrong is said
+  // in the cut bar, beside the field it was pasted in.
+  const [found, setFound] = useState<{ at: [number, number][]; i: number } | null>(null)
+  const [findError, setFindError] = useState<string | null>(null)
   const find = () => {
     if (!source) return
-    const r = locate(source.text, passage)
-    if (r) setRange(r); else setError('That passage isn’t in this source.')
+    const at = locateAll(source.text, passage)
+    setFindError(at.length ? null : 'That passage isn’t in this source.')
+    setFound(at.length > 1 ? { at, i: 0 } : null)
+    if (at.length) setRange(at[0])
+  }
+  const step = () => {
+    if (!found) return
+    const i = (found.i + 1) % found.at.length
+    setFound({ ...found, i }); setRange(found.at[i])
   }
 
   const cut = () => run(async () => {
@@ -307,9 +318,14 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
               <div className="inner gap">
                 <div className="row">
                   <input className="field" style={{ flex: 1, minWidth: '12rem' }} placeholder="Paste a copied passage to find it" maxLength={100000} value={passage}
-                    onChange={(e) => setPassage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && passage.trim() && find()} />
+                    onChange={(e) => { setPassage(e.target.value); setFound(null); setFindError(null) }} onKeyDown={(e) => e.key === 'Enter' && passage.trim() && find()} />
                   <button className="link" disabled={!passage.trim()} onClick={find}>find</button>
+                  {found && <>
+                    <span>Found {found.at.length} times, showing {found.i + 1}</span>
+                    <button className="link" onClick={step}>next</button>
+                  </>}
                 </div>
+                {findError && <p className="error">{findError}</p>}
                 <input className="field" style={{ fontWeight: 600 }} placeholder="Tag" maxLength={1000} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
                 <input className="field" placeholder="Cite" maxLength={2000} value={form.cite} onChange={(e) => setForm({ ...form, cite: e.target.value })} />
                 <div className="row">
