@@ -236,7 +236,7 @@ textarea.card-tag.scan-line { font-weight: 600; }
 .timer-clock.over { text-decoration: underline; text-decoration-thickness: 6px; text-underline-offset: .12em; }
 .timer-speech, .timer-format { text-align: center; }
 .timer-controls, .timer-prep { justify-content: center; }
-.timer-controls .action { min-width: 8rem; text-align: center; }
+.timer-controls .action { min-width: 8rem; text-align: center; justify-content: center; }
 .timer-blocks { padding-left: 0; list-style: none; }
 .timer-blocks li[aria-current="step"] .link { background: var(--button-on); box-shadow: inset 3px 0 0 var(--ink); }
 .timer-log li { font-variant-numeric: tabular-nums; }
