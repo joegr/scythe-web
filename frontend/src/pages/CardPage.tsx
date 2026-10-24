@@ -205,8 +205,8 @@ export default function CardPage() {
         <p>
           {editable
             ? <button className="link" onClick={async () => {
-                const t = await choose()
-                commit(ops.topic({ slug: t.slug, event: t.event, season: t.season, period: t.period, resolution: t.resolution }))
+                const t = await choose().catch(() => null)
+                if (t) commit(ops.topic({ slug: t.slug, event: t.event, season: t.season, period: t.period, resolution: t.resolution }))
               }}>{card.meta.topic ? `${topicLabel(card.meta.topic)}: ${card.meta.topic.resolution}` : 'choose a topic'}</button>
             : card.meta.topic ? `${topicLabel(card.meta.topic)}: ${card.meta.topic.resolution}` : 'no topic'}
         </p>

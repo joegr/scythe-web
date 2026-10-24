@@ -66,7 +66,7 @@ export default function HomePage({ scan = false }: { scan?: boolean }) {
             <button className="link" onClick={() => setClip(clip ? null : { text: '', title: '', cite: '' })}>paste a clip</button>
 .
           </p>
-          <p>Topic: <button className="link" onClick={() => choose()}>{current ? `${topicLabel(current)}: ${current.resolution}` : 'none yet, choose one'}</button></p>
+          <p>Topic: <button className="link" onClick={() => choose().catch(() => {})}>{current ? `${topicLabel(current)}: ${current.resolution}` : 'none yet, choose one'}</button></p>
           {clip && (
             <div className="gap">
               <input className="field" placeholder="Tag" maxLength={1000} value={clip.title} onChange={(e) => setClip({ ...clip, title: e.target.value })} style={{ fontWeight: 600 }} />

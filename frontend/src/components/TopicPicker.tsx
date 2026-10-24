@@ -28,7 +28,6 @@ export default function TopicPicker({ open, onPick, onClose }: { open: boolean; 
     return [...custom, ...NSDA_TOPICS]
       .filter((t) => !event || t.event === event)
       .filter((t) => words.every((w) => `${t.resolution} ${t.season} ${t.period} ${t.slug}`.toLowerCase().includes(w)))
-      .slice(0, 80)
   }, [custom, dq, event])
 
   const create = async () => {

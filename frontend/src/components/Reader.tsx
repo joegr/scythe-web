@@ -334,7 +334,7 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
                 <input className="field" style={{ fontWeight: 600 }} placeholder="Tag" maxLength={1000} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
                 <input className="field" placeholder="Cite" maxLength={2000} value={form.cite} onChange={(e) => setForm({ ...form, cite: e.target.value })} />
                 <div className="row">
-                  <button className="link" onClick={() => choose()} title={topic?.resolution}>{topic ? topicLabel(topic) : 'choose a topic'}</button>
+                  <button className="link" onClick={() => choose().catch(() => {})} title={topic?.resolution}>{topic ? topicLabel(topic) : 'choose a topic'}</button>
                   <input className="field" style={{ flex: 1, minWidth: '6rem' }} placeholder="File" maxLength={300} value={form.file} onChange={(e) => setForm({ ...form, file: e.target.value })} />
                   <input className="field" style={{ flex: 1, minWidth: '6rem' }} placeholder="Block" maxLength={300} value={form.block} onChange={(e) => setForm({ ...form, block: e.target.value })} />
                   <span className={picked > WORDS.card ? 'error' : undefined}>

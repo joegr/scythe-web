@@ -38,8 +38,7 @@ Feature: Choosing the resolution
     And I write my own resolution "Schools should ban phones <run>"
     Then scythe.json lists a topic with resolution "Resolved: Schools should ban phones <run>" and a slug starting "custom-schools-ban-phones"
 
-  @partly @signed-in
-  # today: closing the picker during a cut leaves the reader's Cut button disabled until reload
+  @built @signed-in
   Scenario: Closing the picker doesn't lose the cut
     Given a pasted source "Picker study <run>" by "Alan Robock" in "Nature Food" on "2022-08-15" with text "Soot blocks the sun."
     When I open that source in the reader
@@ -50,8 +49,7 @@ Feature: Choosing the resolution
     Then the cut button is enabled
     And my selection and tag are still there
 
-  @partly @signed-in
-  # today: the list silently stops at 80 topics
+  @built @signed-in
   Scenario: The whole list is reachable
     When I open the resolution picker
     And I filter to "LD"
