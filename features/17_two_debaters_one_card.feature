@@ -43,8 +43,7 @@ Feature: Two debaters mark up the same card
     And the latest commit to the card starts with "underline: \"Soot from burning\", replacing "
     And the card's history still has Ana's commit
 
-  @partly @two-debaters
-  # today: "Your save and main have diverged" / "Rebase mine onto theirs" / "Keep theirs, drop mine" / "Force mine"
+  @built @two-debaters
   Scenario: The stopped save speaks debate
     Given Ana's "highlight" over "block sunlight" landed first and Ben's "underline" over "Soot from burning" was stopped
     Then Ben sees "Ana saved this card first"
@@ -52,8 +51,7 @@ Feature: Two debaters mark up the same card
     And Ben sees "You underlined “Soot from burning” (not saved yet)"
     And Ben sees the choices "Add my change to theirs", "Keep theirs" and "Keep mine"
 
-  @partly @two-debaters
-  # today: an error while settling shows on the page behind the dialog, and Esc can't close it
+  @built @two-debaters
   Scenario: A problem while settling shows in the dialog
     Given Ben's save was stopped
     And the network drops

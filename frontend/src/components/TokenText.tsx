@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, type MouseEvent } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { NameRec, SpanRec } from '../lib/doc'
 import { snapChars } from '../lib/doc'
 import { kindOf, nameState, whoIs } from '../lib/names'
@@ -35,12 +35,15 @@ function snapShown(el: HTMLElement, text: string): [number, number] | null {
 }
 
 /** Card text with formatting drawn as underlines only (thin / heavy / double). */
-export default function TokenText({ text, spans, condensed, editable, showEntities, activeKey, onSelect, onSpanClick, names, onName, mark }: Props) {
+export default function TokenText({ text, spans, condensed: readAloud, editable, showEntities, activeKey, onSelect, onSpanClick, names, onName, mark }: Props) {
+  // Read-aloud keeps only the marked words; a card with nothing marked yet shows all of its words instead of none.
+  const condensed = readAloud && spans.some((s) => s.key !== 'ents' && s.id === undefined)
   const visible = useMemo(() => spans.filter((s) => s.key !== 'ents' || showEntities), [spans, showEntities])
   const all = useMemo(() => (mark ? [...visible, { key: '_mark', label: '', style: '', src: '', start_char: mark[0], end_char: mark[1] }] : visible), [visible, mark])
 
   // Drawing the marked range replaces the text the browser's selection was in, so show it again after each draw.
   const box = useRef<HTMLDivElement>(null)
+  const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null)
   useLayoutEffect(() => {
     if (editable && mark && box.current && window.getSelection()?.isCollapsed !== false) showSelection(box.current, mark)
   }, [editable, mark])
@@ -65,6 +68,7 @@ export default function TokenText({ text, spans, condensed, editable, showEntiti
           shown++
           const cls = new Set<string>()
           const titles: string[] = []
+          const own: string[] = [] // a team's own marks here, named by the page's tip when pointed at
           let suggested: string | undefined
           let name: SpanRec | undefined
           for (const s of real) {
@@ -80,7 +84,7 @@ export default function TokenText({ text, spans, condensed, editable, showEntiti
               cls.add('t-suggested'); suggested ??= s.label; titles.push(`suggested ${s.label}`)
             } else {
               cls.add(STYLE_CLASS[s.style] ?? 't-custom')
-              if (!STYLE_CLASS[s.style]) titles.push(s.label)
+              if (!STYLE_CLASS[s.style]) own.push(s.label)
             }
           }
           if (activeKey && real.some((s) => spanKey(s) === activeKey)) cls.add('t-active')
@@ -91,14 +95,19 @@ export default function TokenText({ text, spans, condensed, editable, showEntiti
             <span key={seg.start} data-start={seg.start} data-span={marks || named ? '' : undefined} data-label={suggested}
               className={[...cls].join(' ') || undefined} title={titles.join(' · ') || undefined}
               onClick={marks || named ? (e) => { if (named) onName!(named, e.currentTarget, 'click'); if (marks) onSpanClick!(marks, e) } : undefined}
-              onMouseEnter={named ? (e) => onName!(named, e.currentTarget, 'enter') : undefined}
-              onMouseLeave={named ? (e) => onName!(named, e.currentTarget, 'leave') : undefined}>
+              onMouseEnter={named || own.length ? (e) => {
+                if (named) onName!(named, e.currentTarget, 'enter')
+                if (own.length) { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: own.join(' · '), x: r.left, y: r.top }) }
+              } : undefined}
+              onMouseLeave={named || own.length ? (e) => { if (named) onName!(named, e.currentTarget, 'leave'); setTip(null) } : undefined}>
               {seg.text}
             </span>,
           )
         }
         return condensed && shown === 0 ? null : <p key={lo}>{children}</p>
       })}
+      {/* Outside the words' own spans, so it never counts as card text. */}
+      {tip && <span role="tooltip" className="mark-tip" style={{ left: tip.x, top: tip.y }}>{tip.text}</span>}
     </div>
   )
 }

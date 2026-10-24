@@ -66,7 +66,7 @@ Feature: Cutting a card from a source
     When I write the tag "Winter <run>"
     Then the cut button is enabled
 
-  @missing @signed-in
+  @built @signed-in
   Scenario: The cite, file and block stay filled in for the next cut
     Given I cut "Nuclear war would cause human extinction." from that source into file "Aff" block "Extinction"
     When I return to that source
@@ -74,7 +74,7 @@ Feature: Cutting a card from a source
     And the file still reads "Aff" and the block "Extinction"
     And the tag is empty
 
-  @missing @signed-in
+  @built @signed-in
   Scenario: Cut with the keyboard alone
     When I open that source in the reader
     And I move the cursor to "starving billions" and extend the selection with Shift and the arrow keys

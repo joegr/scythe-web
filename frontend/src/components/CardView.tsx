@@ -36,6 +36,7 @@ const TIP_WIDTH = 384 // the tip's max width in CSS pixels (24rem at 16px), kept
 export default function CardView({ card, mode = 'full', editable, showEntities, activeKey, onSelect, onSpanClick, onChange, onSettle, mark, meta, link = true }: Props) {
   const [view, setView] = useState<CardMode>(mode)
   const [copied, setCopied] = useState(false)
+  const [noTag, setNoTag] = useState(false)
   const markdown = view === 'md' ? cardMarkdown(card.title, card.meta) : ''
   const original = safeUrl(card.meta.url)
   const month = monthOf(card.published)
@@ -85,9 +86,15 @@ export default function CardView({ card, mode = 'full', editable, showEntities, 
       <h2 className="card-tag">
         {editable && onChange
           ? <input className="field" placeholder="Tag" maxLength={1000} defaultValue={card.title} key={`t${card.updated_at}`}
-              onBlur={(e) => e.target.value !== card.title && onChange({ title: e.target.value })} />
+              onBlur={(e) => {
+                // A card always has a tag: emptied, it goes back to what it was, and says why.
+                if (!e.target.value.trim()) { e.target.value = card.title; setNoTag(true); return }
+                setNoTag(false)
+                if (e.target.value !== card.title) onChange({ title: e.target.value })
+              }} />
           : link ? <Link to={`/cards/${card.number}`}>{card.title}</Link> : card.title}
       </h2>
+      {noTag && <p className="error">A card needs a tag.</p>}
       {editable && onChange
         ? <input className="field card-cite" placeholder="Cite" maxLength={2000} defaultValue={card.meta.cite} key={`c${card.updated_at}`}
             onBlur={(e) => e.target.value !== card.meta.cite && onChange({ cite: e.target.value })} />

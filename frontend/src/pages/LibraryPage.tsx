@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import CardView from '../components/CardView'
 import type { TopicRef } from '../lib/doc'
-import { library, listCards, type CardDoc } from '../lib/store'
+import { library, listCards, listSources, type CardDoc } from '../lib/store'
 import { topicLabel } from '../lib/topic'
 
 /** The resolutions cards are filed under, and the team's files and blocks. */
@@ -37,7 +37,40 @@ export default function LibraryPage() {
           ))}
         </ul>
       </section>
+      <Shelf />
     </div>
+  )
+}
+
+/** The source shelf: the team's sources, newest first, each with the cards cut from it. */
+function Shelf() {
+  const [sources, setSources] = useState<{ number: number; title: string }[] | null>(null)
+  useEffect(() => { listSources().then(setSources).catch(() => setSources([])) }, [])
+  return (
+    <section className="gap">
+      <h1>Sources</h1>
+      {sources?.length === 0 && <p>Open a source to cut a card from it, and it’s kept here.</p>}
+      <ul className="list">
+        {(sources ?? []).map((s) => (
+          <li key={s.number}>
+            <span>{s.title}</span> #{s.number}
+            <SourceCards source={s.number} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function SourceCards({ source }: { source: number }) {
+  const [cards, setCards] = useState<CardDoc[] | null>(null)
+  useEffect(() => { listCards({ source, limit: 50 }).then(setCards).catch(() => setCards([])) }, [source])
+  if (!cards) return null
+  if (!cards.length) return <p>No cards cut from it yet.</p>
+  return (
+    <ul>
+      {cards.map((c) => <li key={c.number}><Link to={`/cards/${c.number}`}>{c.title}</Link></li>)}
+    </ul>
   )
 }
 

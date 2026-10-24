@@ -122,8 +122,9 @@ export function fromIndex(raw: IndexCard): CardDoc {
 
 /** `brief`: only the cards scanned from that brief, in page order. */
 export async function listCards({ topic = null as string | null, file = null as string | null, approved = null as boolean | null,
-  brief = null as string | null, archived = false, limit = 100 } = {}): Promise<CardDoc[]> {
+  brief = null as string | null, source = null as number | null, archived = false, limit = 100 } = {}): Promise<CardDoc[]> {
   const q = new URLSearchParams({ limit: String(limit), archived: String(archived) })
+  if (source !== null) q.set('source_id', String(source))
   if (topic) q.set('topic', topic)
   if (file) q.set('file', file)
   if (brief) q.set('brief', brief)
@@ -299,6 +300,34 @@ export async function createCard(c: NewCard): Promise<number> {
   return (await api<{ number: number }>('POST', '/git/cards', { title: record.title, content: cardFile(record) })).number
 }
 
+/** Card #n as it was at commit `ref` (the history's "open this version"): to look at, not to edit; and its file. */
+export async function cardAt(n: number, ref: string): Promise<{ card: CardDoc; content: string } | null> {
+  const file = await readFile(`cards/${n}.md`, ref)
+  if (!file) return null
+  const record = parseCardFile(file.text)
+  return {
+    content: file.text,
+    card: {
+      number: n, title: record.title, state: 'closed', updated_at: '', author: '', published: null,
+      meta: { kind: 'card', text: record.text, cite: record.cite, url: record.url, source: record.source, topic: record.topic,
+        spans: record.spans, links: record.links },
+      topic: record.topic?.slug ?? null, file: record.file, block: record.block, approved: record.approved,
+      brief: record.brief ?? null, record, sha: file.sha, processed: true, suggestions: [], names: fileNames(record), namesToCheck: 0,
+    },
+  }
+}
+
+/** Put an earlier version back: saved as a new change on top of the card as it is now, so nothing is lost. */
+export async function putBack(card: CardDoc, content: string, when: string) {
+  if (!card.sha) throw new Error('Load the card first.')
+  await putCard(card.number, content, card.sha, `put back the version of ${when}`)
+}
+
+/** A removed card comes back as it last was (a new change; its removal stays in the history). */
+export async function bringBack(n: number) {
+  await api('POST', `/git/cards/${n}/restore`)
+}
+
 /** Remove = delete the file in a commit; the history keeps every version. */
 export async function archiveCard(card: CardDoc) {
   if (!card.sha) throw new Error('Load the card first.')
@@ -353,6 +382,11 @@ export async function cardsCutFrom(n: number): Promise<number> {
   return (await api<unknown[]>('GET', `/cards?${new URLSearchParams({ source_id: String(n), limit: '50' })}`)).length
 }
 
+/** Take a source nobody cut a card from off the shelf (its history stays); the server refuses one with cards. */
+export async function removeSource(n: number): Promise<void> {
+  await api('POST', `/git/sources/${n}/remove`)
+}
+
 export async function listSources(): Promise<{ number: number; title: string }[]> {
   return (await api<{ id: number; title: string; url: string | null }[]>('GET', '/sources?in_git=true&limit=30'))
     .map((s) => ({ number: s.id, title: s.title || s.url || 'Untitled source' }))
@@ -362,13 +396,18 @@ const LOOSE: Record<string, string> = { "'": "['‘’]", '‘': "['‘’]", '�
 
 /** Find a copied passage in source text: exact, then whitespace- and quote-insensitive. */
 export function locate(full: string, passage: string): [number, number] | null {
+  return locateAll(full, passage)[0] ?? null
+}
+
+/** Every place the passage is in the text, in order: exactly, or else with loose spacing and quotes. */
+export function locateAll(full: string, passage: string): [number, number][] {
   const p = passage.trim()
-  if (!p) return null
-  const i = full.indexOf(p)
-  if (i >= 0) return [i, i + p.length]
+  if (!p) return []
+  const exact: [number, number][] = []
+  for (let i = full.indexOf(p); i >= 0; i = full.indexOf(p, i + 1)) exact.push([i, i + p.length])
+  if (exact.length) return exact
   const pattern = p.split(/\s+/).filter(Boolean).map((w) => [...w].map((ch) => LOOSE[ch] ?? ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('')).join('\\s+')
-  const m = new RegExp(pattern).exec(full)
-  return m ? [m.index, m.index + m[0].length] : null
+  return [...full.matchAll(new RegExp(pattern, 'g'))].map((m) => [m.index!, m.index! + m[0].length])
 }
 
 /** An author that's an organization ("Rutgers University-New Brunswick", "AP Staff"), cited by its whole name
@@ -382,7 +421,8 @@ export function defaultCite(s: { title: string; authors: string[]; publisher: st
   const date = s.published ? (() => { const [y, m, d] = s.published!.split('-').map(Number); return [m, d, y].filter((n) => n !== undefined && !Number.isNaN(n)).join('-') })() : ''
   const first = s.authors[0]?.trim() ?? ''
   const name = isOrg(first) ? first : first.split(/\s+/).pop()
-  const head = s.authors.length ? `${name}${year ? ` ${year}` : ''}` : year ? `${(s.publisher || 'Unknown').split(',')[0]} ${year}` : ''
+  // A source with no date says so ("Robock No Date"), as debaters write it, rather than leave the year off unremarked.
+  const head = s.authors.length ? `${name} ${year || 'No Date'}` : year ? `${(s.publisher || 'Unknown').split(',')[0]} ${year}` : ''
   return [head, s.authors.join(', '), s.title ? `"${s.title}"` : '', s.publisher, date, s.url ?? ''].filter(Boolean).join(', ')
 }
 

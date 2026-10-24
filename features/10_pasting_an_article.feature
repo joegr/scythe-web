@@ -46,14 +46,12 @@ Feature: Pasting an article
       Crops fail.
       """
 
-  @partly @signed-in
-  # today: "Robock, Alan" becomes two authors, "Robock" and "Alan"
+  @built @signed-in
   Scenario: An author written "Last, First" stays one person
     When I paste an article with authors "Robock, Alan; Toon, Owen"
     Then the source's front matter has "authors" ["Alan Robock", "Owen Toon"]
 
-  @partly @signed-in
-  # today: "March 2024" is saved as is and the drafted cite reads "undefined-undefined-NaN"
+  @built @signed-in
   Scenario: A date Scythe can't read is caught before saving
     When I paste an article with the date "March 2024"
     Then I see "Write the date as 2024-03-15, or leave the day off: 2024-03."

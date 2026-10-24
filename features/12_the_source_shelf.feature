@@ -27,15 +27,15 @@ Feature: The source shelf
   Scenario: The source knows the cards cut from it
     Then the index lists the card under the source
 
-  @missing
+  @built
   Scenario: Browse every source and what was cut from it
     When I open the library
     Then I see a "Sources" section listing "Shelf study <run>"
     And under it the card "Shelf card <run>"
 
-  @partly
-  # today: there is no way to remove a source in the app
+  @built
   Scenario: Remove a source nobody cut from
+    A source cards were cut from stays: their words are its words.
     Given a source with no cards
     When I remove the source
     Then its file is deleted

@@ -40,8 +40,7 @@ Feature: Scythe reads the card's words
     And within a minute Scythe has checked the card's latest version
     And within 5 minutes I see "Words checked"
 
-  @partly @slow @signed-in
-  # today: the page re-checks for 15 minutes, backing off to once a minute, then stops until reload
+  @built @slow @signed-in
   Scenario: Checking never gets stuck on screen
     Given checking the card takes 4 minutes
     When I keep the card open

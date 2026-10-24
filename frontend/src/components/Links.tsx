@@ -6,6 +6,13 @@ import Autocomplete from './Autocomplete'
 
 const RELATIONS = ['answers', 'supports', 'contradicts', 'elaborates', 'same_claim', 'quotes', 'cites', 'derived_from', 'related']
 
+/** A link seen from the card it points to, as a sentence: "Winter models overstate soot answers this card". */
+const FROM_THE_OTHER_SIDE: Record<string, string> = {
+  answers: 'answers this card', supports: 'supports this card', contradicts: 'contradicts this card',
+  elaborates: 'elaborates on this card', same_claim: 'makes the same claim', quotes: 'quotes this card',
+  cites: 'cites this card', derived_from: 'was cut from this card', related: 'is related to this card',
+}
+
 /** A card's typed links (committed in its file, "Answers #12" in its issue) and the cards linking to it. */
 export default function Links({ card, commit, canEdit }: { card: CardDoc; commit: (op: Op) => void; canEdit: boolean }) {
   const [incoming, setIncoming] = useState<{ rel: string; card: CardDoc }[]>([])
@@ -31,7 +38,7 @@ export default function Links({ card, commit, canEdit }: { card: CardDoc; commit
         ))}
         {incoming.map((i) => (
           <li key={`in-${i.card.number}-${i.rel}`} className="row">
-            <Link to={`/cards/${i.card.number}`}>{i.card.title}</Link><span>{(LINK_WORDS[i.rel] ?? i.rel).toLowerCase()} this card</span>
+            <span><Link to={`/cards/${i.card.number}`}>{i.card.title}</Link> {FROM_THE_OTHER_SIDE[i.rel] ?? `${(LINK_WORDS[i.rel] ?? i.rel).toLowerCase()} this card`}</span>
           </li>
         ))}
       </ul>

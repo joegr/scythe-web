@@ -25,8 +25,9 @@ export default function LabelsPage() {
     <div className="stack">
       <section className="gap">
         <h1>Labels</h1>
-        <p>Each label is a spaCy span group key (sc for card formatting). Custom labels draw as a plain underline.
-          Underline, highlight and emphasis are Scythe’s own and always here. A label a card uses that isn’t listed yet is added here when the card is saved.</p>
+        <p>Marks are how a card’s words are drawn. Underline, highlight and emphasis are Scythe’s own and always here. A team’s
+          own mark, for its own drills, draws as a wavy line and is named when you point at it. A mark a card uses that isn’t
+          listed yet is added here when the card is saved.</p>
         {error && <p className="error">{error}</p>}
         <ul className="list">
           {labels.map((l, i) => (
@@ -41,13 +42,13 @@ export default function LabelsPage() {
       </section>
       {signedIn && (
         <section className="row">
-          <input className="field" style={{ width: '10rem' }} placeholder="New label" maxLength={100} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-          <input className="field" style={{ width: '6rem' }} placeholder="spans key" maxLength={30} value={draft.key} onChange={(e) => setDraft({ ...draft, key: e.target.value })} />
-          <select className="field" style={{ width: '8rem' }} value={draft.style} onChange={(e) => setDraft({ ...draft, style: e.target.value })}>
-            {STYLES.map((s) => <option key={s}>{s}</option>)}
+          {/* A team's mark goes with Scythe's own (key sc). */}
+          <input className="field" style={{ width: '10rem' }} aria-label="Mark name" placeholder="New mark" maxLength={100} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <select className="field" style={{ width: '8rem' }} aria-label="Drawn as" value={draft.style} onChange={(e) => setDraft({ ...draft, style: e.target.value })}>
+            {STYLES.map((s) => <option key={s} value={s}>{s === 'custom' ? 'its own line' : s}</option>)}
           </select>
-          <input className="field" style={{ width: '3rem' }} maxLength={1} placeholder="key" value={draft.hotkey ?? ''} onChange={(e) => setDraft({ ...draft, hotkey: e.target.value })} />
-          <button className="link" disabled={!draft.name.trim()} onClick={() => { save([...labels, { ...draft, hotkey: draft.hotkey || null }]); setDraft({ ...draft, name: '', hotkey: '' }) }}>add</button>
+          <input className="field" style={{ width: '3rem' }} aria-label="Key" maxLength={1} placeholder="key" value={draft.hotkey ?? ''} onChange={(e) => setDraft({ ...draft, hotkey: e.target.value })} />
+          <button className="link" disabled={!draft.name.trim()} onClick={() => { save([...labels, { ...draft, name: draft.name.trim(), hotkey: draft.hotkey || null }]); setDraft({ ...draft, name: '', hotkey: '' }) }}>Add mark</button>
         </section>
       )}
     </div>

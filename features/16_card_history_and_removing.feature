@@ -14,28 +14,27 @@ Feature: A card's history, and removing a card
     When I open the card
     And I open the card's history
     Then the history lists, newest first:
-      | highlight: "block sunlight" (#<n>)           |
-      | underline: "Soot from burning cities" (#<n>) |
-      | card: History <run> (#<n>)                    |
+      | You highlighted “block sunlight”          |
+      | You underlined “Soot from burning cities” |
+      | You cut the card “History <run>”          |
     And each history entry names who made it
+    And no one's email is in the history, on screen or in what the server sends
 
-  @partly @signed-in
-  # today: each entry shows a 7-character commit id and the raw commit message
+  @built @signed-in
   Scenario: History reads as sentences
     Given the card has a "highlight" span over "block sunlight"
     When I open the card
     And I open the card's history
     Then I see "You highlighted “block sunlight”"
 
-  @missing @signed-in
+  @built @signed-in
   Scenario: Open an earlier version
     Given the card has a "highlight" span over "block sunlight"
     When I open the version before the highlight
     Then the card shows no highlight
     And I can put that version back, which saves it as a new change
 
-  @partly @signed-in
-  # today: archive acts at once, with no question, and a failure does nothing visible
+  @built @signed-in
   Scenario: Removing a card asks first, and says if it failed
     When I open the card
     And I remove the card
@@ -43,7 +42,7 @@ Feature: A card's history, and removing a card
     When I confirm
     Then cards/<n>.md is deleted with the commit "archive: History <run> (#<n>)"
 
-  @missing @signed-in
+  @built @signed-in
   Scenario: Bring a removed card back
     Given the card was removed
     When I search the removed cards and open it

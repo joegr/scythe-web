@@ -58,7 +58,7 @@ export default function PrintPage({ frontlines = false }: { frontlines?: boolean
       <div className="row no-print">
         <button className={`link ${!raw ? 'on' : ''}`} aria-pressed={!raw} onClick={() => setRaw(false)}>preview</button>
         <button className={`link ${raw ? 'on' : ''}`} aria-pressed={raw} onClick={() => setRaw(true)}>markdown</button>
-        <button className={`link ${condensed ? 'on' : ''}`} aria-pressed={condensed} onClick={() => setCondensed(!condensed)}>read only</button>
+        <button className={`link ${condensed ? 'on' : ''}`} aria-pressed={condensed} onClick={() => setCondensed(!condensed)}>read-aloud</button>
         <button className="link spacer" onClick={() => window.print()}>print</button>
       </div>
       {error && <p className="error">{error}</p>}

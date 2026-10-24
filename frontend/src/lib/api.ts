@@ -125,10 +125,11 @@ export const me = () => api<User>('GET', '/auth/me')
 
 // ---------------------------------------------------------------- git files
 
-/** A record file at the branch tip, with its blob sha: the version a save must build on. */
-export async function readFile(path: string): Promise<{ text: string; sha: string } | null> {
+/** A record file at the branch tip, with its blob sha: the version a save must build on. With `ref` (a commit from
+ *  the history), the file as it was then. */
+export async function readFile(path: string, ref?: string): Promise<{ text: string; sha: string } | null> {
   try {
-    const f = await api<{ content: string; sha: string }>('GET', `/git/file?${new URLSearchParams({ path })}`)
+    const f = await api<{ content: string; sha: string }>('GET', `/git/file?${new URLSearchParams(ref ? { path, ref } : { path })}`)
     return { text: f.content, sha: f.sha }
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) return null

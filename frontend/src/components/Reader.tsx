@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { CARDS_PER_SOURCE, countWords, htmlToText, pasteOver, safeUrl, sanitizeText, siteOf, SOURCE_FULL, tooLongSource, WORDS } from '../lib/text'
+import { CARDS_PER_SOURCE, countWords, htmlToText, parseAuthors, pasteOver, safeUrl, sanitizeText, siteOf, SOURCE_FULL, tooLongSource, WORDS } from '../lib/text'
 import { ApiError, config } from '../lib/api'
 import { pastedPage, type ReadPage } from '../lib/bookmarklet'
 import { snapChars } from '../lib/doc'
-import { selectionRange } from '../lib/render'
+import { caretOffset, selectionRange } from '../lib/render'
 import { readPhoto } from '../lib/scan'
-import { cardsCutFrom, createCard, createSource, defaultCite, fetchSource, getSource, listSources, locate, type SourceDoc } from '../lib/store'
+import { cardsCutFrom, createCard, createSource, defaultCite, fetchSource, getSource, listSources, locateAll, removeSource, type SourceDoc } from '../lib/store'
 import { topicLabel, useTopic } from '../lib/topic'
 import PhotoPick from './PhotoPick'
 import ReadHere from './ReadHere'
@@ -77,9 +77,12 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
   function load(s: SourceDoc) {
     setSource(s)
     setCuts(null)
+    keys.current = null
     const ticket = asked.current
     cardsCutFrom(s.number).then((n) => { if (ticket === asked.current) setCuts(n) }).catch(() => setCuts(null))
-    setForm((f) => ({ ...f, cite: s.head.cite || defaultCite(s.head) }))
+    // Back at a source cut from before: the cite, file and block as they were for its last cut, the tag empty.
+    const last = lastCut(s.number)
+    setForm((f) => ({ title: '', cite: last?.cite ?? (s.head.cite || defaultCite(s.head)), file: last?.file ?? f.file, block: last?.block ?? f.block }))
   }
 
   async function run(fn: () => Promise<void>) {
@@ -107,7 +110,7 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
     }
     const isHtml = /^\s*</.test(paste.text)
     const parsed = isHtml ? htmlToText(paste.text) : { title: '', text: sanitizeText(paste.text) }
-    const authors = paste.authors.split(/;|,/).map((a) => a.trim()).filter(Boolean)
+    const authors = parseAuthors(paste.authors)
     const meta = { title: paste.title || parsed.title || parsed.text.slice(0, 80), url: paste.url || null, publisher: paste.publisher,
       published: paste.published || null, authors }
     load(await getSource(await createSource({ ...meta, text: parsed.text, cite: defaultCite(meta) })))
@@ -119,10 +122,21 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
     if (source) setPassage(source.text.slice(r[0], r[1]))
   }
 
+  // Every place the copied passage is, so a passage in the source twice can be stepped through; what went wrong is said
+  // in the cut bar, beside the field it was pasted in.
+  const [found, setFound] = useState<{ at: [number, number][]; i: number } | null>(null)
+  const [findError, setFindError] = useState<string | null>(null)
   const find = () => {
     if (!source) return
-    const r = locate(source.text, passage)
-    if (r) setRange(r); else setError('That passage isn’t in this source.')
+    const at = locateAll(source.text, passage)
+    setFindError(at.length ? null : 'That passage isn’t in this source.')
+    setFound(at.length > 1 ? { at, i: 0 } : null)
+    if (at.length) setRange(at[0])
+  }
+  const step = () => {
+    if (!found) return
+    const i = (found.i + 1) % found.at.length
+    setFound({ ...found, i }); setRange(found.at[i])
   }
 
   const cut = () => run(async () => {
@@ -136,7 +150,8 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
     const title = form.title.trim() || firstWords(text)
     const card = await createCard({ text, title, cite: form.cite, url: source.head.url ?? '',
       source: source.number, topic: t, file: form.file || null, block: form.block || null })
-    setForm((f) => ({ ...f, title: '' })); setPassage(''); setRange(null)
+    keepCut(source.number, form)
+    setForm((f) => ({ ...f, title: '' })); setPassage(''); setRange(null); keys.current = null
     setCuts((n) => (n === null ? null : n + 1))
     onCut(card)
   })
@@ -146,6 +161,33 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
   const full = cuts !== null && cuts >= CARDS_PER_SOURCE
   const cutBlocked = picked > WORDS.card || full
   const pastedWords = /^\s*</.test(paste.text) ? null : countWords(paste.text)
+
+  // Cutting with the keyboard alone: with the caret in the text, Shift and the arrow keys move the selection's far end
+  // a character at a time (shown snapped to whole words, as a mouse selection is), and Cmd or Ctrl+Enter cuts.
+  const keys = useRef<{ anchor: number; focus: number } | null>(null)
+  useEffect(() => {
+    if (!source) return
+    const onKey = (e: KeyboardEvent) => {
+      const box = textRef.current
+      if (!box) return
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        if (range && form.title.trim() && !busy && !cutBlocked) { e.preventDefault(); cut() }
+        return
+      }
+      if (!e.shiftKey || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return
+      if ((e.target as HTMLElement | null)?.closest?.('input, textarea, select')) return
+      const k = keys.current ?? (() => { const at = caretOffset(box); return at === null ? null : { anchor: at, focus: at } })()
+      if (!k) return
+      e.preventDefault()
+      const focus = Math.max(0, Math.min(source.text.length, k.focus + (e.key === 'ArrowRight' ? 1 : -1)))
+      keys.current = { anchor: k.anchor, focus }
+      window.getSelection()?.removeAllRanges()
+      const s = k.anchor === focus ? null : snapChars(source.text, Math.min(k.anchor, focus), Math.max(k.anchor, focus))
+      if (s) pick(s); else setRange(null)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  })
 
   // The cut tooltip sits just above the selected words.
   const [tip, setTip] = useState<{ top: number; left: number } | null>(null)
@@ -213,7 +255,8 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
                   )}
                   <input className="field" placeholder="Title" maxLength={1000} value={paste.title} onChange={(e) => setPaste({ ...paste, title: e.target.value })} />
                   <input className="field" placeholder="Link" maxLength={2048} value={paste.url} onChange={(e) => setPaste({ ...paste, url: e.target.value })} />
-                  <input className="field" placeholder="Authors, separated by commas" maxLength={2000} value={paste.authors} onChange={(e) => setPaste({ ...paste, authors: e.target.value })} />
+                  <input className="field" placeholder="Authors, separated by commas"
+                    title="Alan Robock, Owen Toon; or last name first with semicolons between people: Robock, Alan; Toon, Owen" maxLength={2000} value={paste.authors} onChange={(e) => setPaste({ ...paste, authors: e.target.value })} />
                   <div className="row">
                     <input className="field" style={{ flex: 2 }} placeholder="Publication" maxLength={300} value={paste.publisher} onChange={(e) => setPaste({ ...paste, publisher: e.target.value })} />
                     <input className="field" style={{ flex: 1 }} placeholder="Date, YYYY-MM-DD" maxLength={10} value={paste.published} onChange={(e) => setPaste({ ...paste, published: e.target.value })} />
@@ -226,9 +269,11 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
                 : 'The article’s text is kept exactly as you paste it, so every card cut from it is word for word.'}</p>}
               {mode !== 'photo' && (
                 <button className="action" disabled={busy || (mode === 'url' ? !url.trim() : !paste.text.trim() || (pastedWords ?? 0) > WORDS.source)} onClick={openSource}>
-                  {fetching ? 'Reading the article…' : busy ? 'Saving…' : 'Read'}
+                  {fetching ? 'Reading…' : busy ? 'Saving…' : 'Read'}
                 </button>
               )}
+              {/* Scythe reads politely (one page at a time per site, its rules first), so a fetch can take a while. */}
+              {fetching && <p className="note">Reading the article… this takes about a minute</p>}
             </div>
             {recent.length > 0 && (
               <ul className="list">
@@ -245,12 +290,18 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
               {safeUrl(source.head.url) && <> · <a href={safeUrl(source.head.url)!} target="_blank" rel="noreferrer noopener">original, {siteOf(safeUrl(source.head.url)!)}</a></>}
               {' · '}<a href={`${config.apiBase()}/api/git/file?path=sources/${source.number}.md`} target="_blank" rel="noreferrer">#{source.number}</a>
               {cuts !== null && <> · {cuts} of {CARDS_PER_SOURCE} cards cut</>}
+              {cuts === 0 && <> · <button className="link" disabled={busy} onClick={() => run(async () => {
+                await removeSource(source.number)
+                setSource(null); setMode('paste'); setNote('Source removed. Its history keeps it.')
+                setRecent((r) => r.filter((x) => x.number !== source.number))
+              })}>Remove source</button></>}
             </p>
             {full && <p className="note">{SOURCE_FULL}</p>}
             <div ref={textRef} className="reader-text" onMouseUp={(e) => {
                 // The words picked show as the whole tokens they touch, as on a card (snapChars); the browser's
                 // ragged selection goes. A double click still takes the whole paragraph, after this.
                 const r = selectionRange(e.currentTarget), s = r && snapChars(source.text, r[0], r[1])
+                keys.current = null
                 if (s) { window.getSelection()?.removeAllRanges(); pick(s) }
               }}
               onDoubleClick={(e) => {
@@ -272,13 +323,18 @@ export default function Reader({ open, onClose, onCut, sourceNumber, page }: Pro
               <div className="inner gap">
                 <div className="row">
                   <input className="field" style={{ flex: 1, minWidth: '12rem' }} placeholder="Paste a copied passage to find it" maxLength={100000} value={passage}
-                    onChange={(e) => setPassage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && passage.trim() && find()} />
+                    onChange={(e) => { setPassage(e.target.value); setFound(null); setFindError(null) }} onKeyDown={(e) => e.key === 'Enter' && passage.trim() && find()} />
                   <button className="link" disabled={!passage.trim()} onClick={find}>find</button>
+                  {found && <>
+                    <span>Found {found.at.length} times, showing {found.i + 1}</span>
+                    <button className="link" onClick={step}>next</button>
+                  </>}
                 </div>
+                {findError && <p className="error">{findError}</p>}
                 <input className="field" style={{ fontWeight: 600 }} placeholder="Tag" maxLength={1000} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
                 <input className="field" placeholder="Cite" maxLength={2000} value={form.cite} onChange={(e) => setForm({ ...form, cite: e.target.value })} />
                 <div className="row">
-                  <button className="link" onClick={() => choose()} title={topic?.resolution}>{topic ? topicLabel(topic) : 'choose a topic'}</button>
+                  <button className="link" onClick={() => choose().catch(() => {})} title={topic?.resolution}>{topic ? topicLabel(topic) : 'choose a topic'}</button>
                   <input className="field" style={{ flex: 1, minWidth: '6rem' }} placeholder="File" maxLength={300} value={form.file} onChange={(e) => setForm({ ...form, file: e.target.value })} />
                   <input className="field" style={{ flex: 1, minWidth: '6rem' }} placeholder="Block" maxLength={300} value={form.block} onChange={(e) => setForm({ ...form, block: e.target.value })} />
                   <span className={picked > WORDS.card ? 'error' : undefined}>
@@ -307,6 +363,17 @@ function Para({ start, text, range }: { start: number; text: string; range: [num
       {b < text.length && <span data-start={start + b}>{text.slice(b)}</span>}
     </p>
   )
+}
+
+/** What a source's last cut was filed with, on this device: a debater cutting card after card from one article keeps
+ *  its cite, file and block. */
+type CutForm = { cite: string; file: string; block: string }
+const cutKey = (source: number) => `scythe:cut:${source}`
+function lastCut(source: number): CutForm | null {
+  try { const raw = localStorage.getItem(cutKey(source)); return raw ? JSON.parse(raw) as CutForm : null } catch { return null }
+}
+function keepCut(source: number, { cite, file, block }: CutForm) {
+  try { localStorage.setItem(cutKey(source), JSON.stringify({ cite, file, block })) } catch { /* storage blocked: the form starts over */ }
 }
 
 /** A tag to start from: the passage's first words. */

@@ -31,18 +31,17 @@ Feature: Answering and linking cards
     Then the other card's front matter has no links
     And the latest commit to the other card reads "unlink supports #<first> (#<other>)"
 
-  @partly
-  # today: "Winter models overstate soot same claim as this card"
+  @built
   Scenario Outline: Links read as sentences from the other side
     Given the other card links "<rel>" to the first card
     When I open the first card
     Then I see "<reads>"
 
     Examples:
-      | rel         | reads                                                  |
-      | answers     | Winter models overstate soot answers this card         |
-      | same_claim  | Winter models overstate soot makes the same claim      |
-      | contradicts | Winter models overstate soot contradicts this card     |
+      | rel         | reads                                                    |
+      | answers     | Winter models overstate soot <run> answers this card     |
+      | same_claim  | Winter models overstate soot <run> makes the same claim  |
+      | contradicts | Winter models overstate soot <run> contradicts this card |
 
   @built @signed-in @mvp
   Scenario: Frontlines: every answer to a card, ready to print

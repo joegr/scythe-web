@@ -32,20 +32,18 @@ Feature: Files, blocks and approval
     And I open the file "Lib <run>"
     Then I see the block "Solvency" with the card "Filed <run>"
 
-  @partly @signed-in
-  # today: filing with no block was dropped from the library
+  @built @signed-in
   Scenario: A file with no block still shows in the library
     When I open the card
     And I file it under file "Loose <run>" and no block
     Then the library shows "Loose <run>" with the card under "Unfiled"
 
-  @partly
-  # today: GitHub labels cut file names to 50 characters
+  @built
   Scenario: A long file name isn't cut short
     When I file a card under "Neg – Arctic militarization DA – Russia escalation links"
     Then the library shows the whole name
 
-  @missing @signed-in
+  @built @signed-in
   Scenario: Approval says what it means
     When I open the card
     Then the approve button explains "Approve when the card is cut and checked, ready for rounds."

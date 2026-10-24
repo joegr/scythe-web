@@ -30,8 +30,7 @@ Feature: Reading a card three ways
     And I switch to the plain text view
     Then the plain text reads "Nuclear war would cause human extinction. Soot from burning cities would ==block sunlight== for a **decade**."
 
-  @partly
-  # today: read-aloud drops unmarked text, so a new card looks empty in Home, Search and Library
+  @built
   Scenario: A card with nothing marked yet still shows its words in lists
     Given a card "Fresh <run>" with the text "Nothing is marked in this card yet."
     When I look at the latest cards

@@ -27,16 +27,16 @@ Feature: Finding a copied passage in a source
     And I find the copied passage "a passage from some other article"
     Then I see "That passage isn’t in this source."
 
-  @partly @signed-in
-  # today: the message appears at the top of the reader, scrolled out of sight of the cut bar
+  @built @signed-in
   Scenario: The message shows next to where you pasted
     Given that source is a full-length article
     When I open that source in the reader
     And I find the copied passage "a passage from some other article"
     Then the message is visible without scrolling
 
-  @missing @signed-in
+  @built @signed-in
   Scenario: A passage that appears twice asks which one
     Given the source contains "a decade-long winter" twice
-    When I find the copied passage "a decade-long winter"
+    When I open that source in the reader
+    And I find the copied passage "a decade-long winter"
     Then I see "Found 2 times" and can step between them

@@ -32,8 +32,7 @@ Feature: The tag and the cite
     Then the card's front matter has "cite" "Robock 22, Distinguished Professor of Climate Science at Rutgers, Nature Food"
     And the short cite "Robock 22" is shown in bold
 
-  @partly @signed-in
-  # today: clearing the tag is silently ignored and the field stays blank
+  @built @signed-in
   Scenario: A tag can't be emptied
     Given a card "Soot <run>" cut from that source
     When I open the card
@@ -48,13 +47,8 @@ Feature: The tag and the cite
     Then the drafted cite starts with "<short cite>"
 
     @built
-    Examples: Scythe drafts these today
+    Examples: A missing date is said out loud
       | authors     | publication | date       | short cite     |
       | Alan Robock | Nature Food | 2022-08-15 | Robock 22      |
       |             | Nature Food | 2022-08-15 | Nature Food 22 |
-
-    @partly
-    # today: with no date the short cite is just "Robock", with nothing to say the date is missing
-    Examples: A missing date is said out loud
-      | authors     | publication | date       | short cite     |
       | Alan Robock | Nature Food |            | Robock No Date |
