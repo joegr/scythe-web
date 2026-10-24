@@ -39,6 +39,42 @@
         "title": "ArchiveIn",
         "type": "object"
       },
+      "BlockIn": {
+        "properties": {
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "seconds": {
+            "maximum": 14400,
+            "minimum": 1,
+            "title": "Seconds",
+            "type": "integer"
+          },
+          "short": {
+            "default": "",
+            "maxLength": 10,
+            "minLength": 0,
+            "title": "Short",
+            "type": "string"
+          },
+          "used": {
+            "default": 0,
+            "maximum": 86400,
+            "minimum": 0,
+            "title": "Used",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "seconds"
+        ],
+        "title": "BlockIn",
+        "type": "object"
+      },
       "BriefIn": {
         "properties": {
           "name": {
@@ -344,6 +380,76 @@
           }
         },
         "title": "CardPatch",
+        "type": "object"
+      },
+      "EntryIn": {
+        "properties": {
+          "at": {
+            "maxLength": 40,
+            "title": "At",
+            "type": "string"
+          },
+          "card": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card"
+          },
+          "case": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case"
+          },
+          "did": {
+            "enum": [
+              "began",
+              "opened card",
+              "found card",
+              "scanned card",
+              "opened case"
+            ],
+            "title": "Did",
+            "type": "string"
+          },
+          "during": {
+            "default": "",
+            "maxLength": 80,
+            "minLength": 0,
+            "title": "During",
+            "type": "string"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 0,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          }
+        },
+        "required": [
+          "at",
+          "did"
+        ],
+        "title": "EntryIn",
         "type": "object"
       },
       "InviteIn": {
@@ -707,6 +813,43 @@
         "title": "PasswordIn",
         "type": "object"
       },
+      "PrepIn": {
+        "properties": {
+          "seconds": {
+            "maximum": 14400,
+            "minimum": 0,
+            "title": "Seconds",
+            "type": "integer"
+          },
+          "sides": {
+            "items": {
+              "maxLength": 30,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Sides",
+            "type": "array"
+          },
+          "used": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Used",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sides",
+          "seconds",
+          "used"
+        ],
+        "title": "PrepIn",
+        "type": "object"
+      },
       "PushIn": {
         "properties": {
           "endpoint": {
@@ -829,6 +972,76 @@
           "role"
         ],
         "title": "RoleIn",
+        "type": "object"
+      },
+      "RoundIn": {
+        "properties": {
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/BlockIn"
+            },
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Blocks",
+            "type": "array"
+          },
+          "ended": {
+            "maxLength": 40,
+            "title": "Ended",
+            "type": "string"
+          },
+          "format": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Format",
+            "type": "string"
+          },
+          "log": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EntryIn"
+            },
+            "maxItems": 5000,
+            "title": "Log",
+            "type": "array"
+          },
+          "notes": {
+            "default": "",
+            "maxLength": 50000,
+            "minLength": 0,
+            "title": "Notes",
+            "type": "string"
+          },
+          "prep": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PrepIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started": {
+            "maxLength": 40,
+            "title": "Started",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "maxLength": 200,
+            "minLength": 0,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "started",
+          "ended",
+          "blocks"
+        ],
+        "title": "RoundIn",
         "type": "object"
       },
       "SaveFile": {
@@ -2566,6 +2779,79 @@
         "summary": "Search Names",
         "tags": [
           "names"
+        ]
+      }
+    },
+    "/api/rounds": {
+      "get": {
+        "operationId": "list_rounds",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "List Rounds",
+        "tags": [
+          "rounds"
+        ]
+      },
+      "post": {
+        "description": "A finished round, from the timer: its times, what was opened when, and the notes. One commit.",
+        "operationId": "save_round",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoundIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "summary": "Save Round",
+        "tags": [
+          "rounds"
+        ]
+      }
+    },
+    "/api/rounds/{n}": {
+      "get": {
+        "operationId": "get_round",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "Get Round",
+        "tags": [
+          "rounds"
         ]
       }
     },
