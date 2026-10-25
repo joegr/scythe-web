@@ -3,6 +3,7 @@ import { api, config, type Role, type User } from '../lib/api'
 import { appleConfigured, linkApple } from '../lib/apple'
 import { createPasskey, passkeysSupported } from '../lib/passkey'
 import { pushSubscription, pushSupported, testPush, turnOffPush, turnOnPush } from '../lib/push'
+import { forgetShared } from '../lib/scan'
 import { useSession } from '../lib/session'
 import ReadHere from '../components/ReadHere'
 
@@ -109,6 +110,15 @@ export default function AccountPage() {
       </section>
 
       <Notifications />
+
+      <section className="gap">
+        <h2>Scans you shared</h2>
+        <p className="note">When you save a scanned card you can tick “Help improve scanning”: that card’s picture and the words you checked are sent to Scythe and kept, to make scanning better. Nothing is sent unless you tick it.</p>
+        <button className="link" onClick={async () => {
+          try { const { forgotten } = await forgetShared(); setMessage(forgotten ? `Forgot ${forgotten === 1 ? 'the scan' : `all ${forgotten} scans`} you shared.` : 'You haven’t shared any scans.') }
+          catch (e) { setMessage((e as Error).message) }
+        }}>Forget the scans I shared</button>
+      </section>
 
       {user.role === 'admin' && <Team me={user} />}
 
