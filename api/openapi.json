@@ -736,6 +736,11 @@
             "title": "Id",
             "type": "integer"
           },
+          "kept": {
+            "default": false,
+            "title": "Kept",
+            "type": "boolean"
+          },
           "kind": {
             "title": "Kind",
             "type": "string"
