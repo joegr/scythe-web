@@ -17,6 +17,8 @@ export type ScanKind = 'screenshot' | 'photo'
 export interface Page {
   id: number; brief: number | null; ordinal: number; kind: ScanKind; status: 'queued' | 'reading' | 'read' | 'failed'
   error: string; words: number; corners: number[] | null; cards: number[]; created_at: string; read_at: string | null
+  /** The training school: the OCR service kept this page's picture, for the team to annotate (/train/). */
+  kept?: boolean
 }
 /** A brief being scanned: its pages' progress, and how many of its cards wait to be checked. */
 export interface Brief { id: number; name: string; pages: Page[]; queued: number; read: number; failed: number; waiting: number; created_at: string }

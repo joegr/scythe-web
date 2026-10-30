@@ -9,7 +9,9 @@ const BIG_ENOUGH = 0.18 // the card must fill this much of the frame to be read 
 /** Over the live camera, as an ID scanner does: a frame to fit the card in with a guide line across it, the card's
  *  outline once it's found, and the picture taken by itself when the card holds still (once per card: it waits for the
  *  card to leave or move before taking another). */
-export default function Finder({ video, live, onSteady }: { video: React.RefObject<HTMLVideoElement | null>; live: boolean; onSteady: () => void }) {
+/** `onSteady` gets the card's corners as it held still (fractions of the frame, TL TR BR BL): the server squares the
+ *  photo up to them rather than looking for the page again. */
+export default function Finder({ video, live, onSteady }: { video: React.RefObject<HTMLVideoElement | null>; live: boolean; onSteady: (quad: Quad) => void }) {
   const [quad, setQuad] = useState<Quad | null>(null)
   const [size, setSize] = useState<{ w: number; h: number } | null>(null)
   const [steady, setSteady] = useState(0)
@@ -43,7 +45,7 @@ export default function Finder({ video, live, onSteady }: { video: React.RefObje
       still = last && drift(last, q) < STILL ? still + 1 : 0
       last = q
       setQuad(q); setSteady(Math.min(still, STEADY))
-      if (armed && still >= STEADY) { armed = false; still = 0; fire.current() }
+      if (armed && still >= STEADY) { armed = false; still = 0; fire.current(q) }
     }
     const timer = setInterval(look, EVERY)
     return () => { clearInterval(timer); if (canvas.current) { canvas.current.width = 0; canvas.current.height = 0 } }
