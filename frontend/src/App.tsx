@@ -129,6 +129,12 @@ function Shell({ error }: { error: string | null }) {
   const labels = useLabelsLoader()
   const { user } = useSession()
   const [panel, setPanel] = useState<'me' | null>(null)
+  // The training school keeps its scanned pictures for its members to annotate, at the team server's /train/.
+  const [training, setTraining] = useState(false)
+  useEffect(() => {
+    if (!user) return
+    api<{ training: boolean }>('GET', '/train/status').then((t) => setTraining(t.training), () => setTraining(false))
+  }, [user])
   return (
     <LabelsContext.Provider value={labels}>
       <TopicProvider>
@@ -144,6 +150,7 @@ function Shell({ error }: { error: string | null }) {
             <NavLink to="/timer">timer</NavLink>
             <NavLink to="/team">team</NavLink>
             <NavLink to="/labels">labels</NavLink>
+            {training && <a href={`${config.apiBase()}/train/`} title="Write down what scanned pages really say">training</a>}
             {user && <NavLink to="/account" title="Your account">{user.handle}</NavLink>}
             {user && <button className="link" aria-expanded={panel === 'me'} onClick={() => setPanel(panel === 'me' ? null : 'me')}>sign out</button>}
           </nav>

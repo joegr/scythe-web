@@ -158,11 +158,11 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
   }
 
   /** Send a picture to be read. The camera stays ready for the next page. */
-  const send = async (where: string, get: () => Promise<{ blob: Blob; kind: ScanKind }>) => {
+  const send = async (where: string, get: () => Promise<{ blob: Blob; kind: ScanKind; corners?: number[] }>) => {
     setError(null)
     setSending(++inFlight.current)
     try {
-      const { blob, kind } = await get()
+      const { blob, kind, corners } = await get()
       const name = briefName.trim()
       if (name && !brief.current) {
         briefComing.current ??= createBrief(name).then((b) => { brief.current = b; nextOrdinal.current = 1; return b })
@@ -171,7 +171,7 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
       const b = name ? brief.current : null
       const ordinal = b ? nextOrdinal.current++ : undefined
       setStatus(b ? `Sending page ${ordinal} of ${b.name}…` : kind === 'screenshot' ? 'Sending the screenshot…' : 'Sending the photo…')
-      const page = await sendPage(blob, kind, { brief: b?.id, ordinal, onWait: waiting })
+      const page = await sendPage(blob, kind, { brief: b?.id, ordinal, corners, onWait: waiting })
       keep(page.id, blob, kind)
       notePage(page)
       setStatus(null)
@@ -182,7 +182,8 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
       fail(where, e)
     }
   }
-  const take = () => void send('take', async () => ({ blob: await stillPhoto(video.current!), kind: 'photo' }))
+  // The corners the finder held steady go with the photo, so the server squares it up to them.
+  const take = (quad?: number[]) => void send('take', async () => ({ blob: await stillPhoto(video.current!), kind: 'photo', corners: quad }))
   const chose = (f: File) => void send('photo', async () => ({ blob: f, kind: await kindOf(f) }))
 
   /** Send a page again from the picture still on this phone: a page that wasn't read, or the current card's page as
@@ -361,6 +362,7 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
   const progress = (id: number) => briefs.find((b) => b.id === id)
   const c = current
   const kept = c ? pictures.current.has(c.page) : false
+  const keptForTraining = c ? Boolean(pages.get(c.page)?.kept) : false
   return (
     <dialog ref={ref} className="sheet" onCancel={onClose}>
       <div className="sheet-inner stack">
@@ -378,7 +380,7 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
               <video ref={video} playsInline muted autoPlay />
               <Finder video={video} live={live && step === 'camera'} onSteady={take} />
             </div>
-            {live && <button className="action" onClick={take}>take the picture</button>}
+            {live && <button className="action" onClick={() => take()}>take the picture</button>}
             {/* The camera is Scythe's own, above: never the phone's camera app. */}
             <PhotoPick take={false} onPhoto={chose} />
             {strip}
@@ -460,7 +462,9 @@ export default function Scan({ open, onClose, onSaved, onSavedBrief, start = 'ca
                 <button className="link" onClick={() => setFixing(null)}>cancel</button>
               </div>
             )}
-            {kept
+            {keptForTraining
+              ? <p className="note">This team keeps scanned pictures to improve scanning: this page’s is kept, with the words you check.</p>
+              : kept
               ? <label className="row note"><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} />
                   Help improve scanning: send this picture and the words I checked to Scythe.</label>
               : <p className="note">This page’s picture isn’t on this device, so it can’t be shared to help improve scanning.</p>}
